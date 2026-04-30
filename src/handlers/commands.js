@@ -100,8 +100,9 @@ function register(app) {
     });
   });
 
-  // ─── 버튼: 카카오맵 (URL 이동만) ────────────────────
+  // ─── 버튼: 카카오맵 / 지도 뷰 (URL 이동만) ──────────
   app.action('open_kakao_map', async ({ ack }) => { await ack(); });
+  app.action('open_map_view', async ({ ack }) => { await ack(); });
 }
 
 // ─── 화면 렌더링 ──────────────────────────────────────
@@ -140,10 +141,11 @@ async function renderExploration(userId) {
 
 async function renderMap() {
   const team = await rankingSvc.getTeamMap();
+  const mapUrl = process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL.replace(/\/$/, '')}/map` : null;
   return {
     response_type: 'in_channel',
     text: '🗺️ 팀 탐험 지도',
-    blocks: blocks.teamMapBlocks(team),
+    blocks: blocks.teamMapBlocks(team, mapUrl),
   };
 }
 

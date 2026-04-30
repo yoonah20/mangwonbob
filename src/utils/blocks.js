@@ -184,7 +184,7 @@ function explorationBlocks(userId, exp) {
 }
 
 // /밥 지도 — 팀 전체 현황
-function teamMapBlocks(team) {
+function teamMapBlocks(team, mapUrl) {
   const ratio = team.total ? team.discovered / team.total : 0;
   const lines = [
     '🗺️ *몬스테라하우스 탐험 지도*',
@@ -204,10 +204,23 @@ function teamMapBlocks(team) {
   }
   lines.push('━━━━━━━━━━━━━━━━━━━');
 
-  return [
+  const result = [
     { type: 'section', text: { type: 'mrkdwn', text: lines.join('\n') } },
-    footer(),
   ];
+  if (mapUrl) {
+    result.push({
+      type: 'actions',
+      elements: [{
+        type: 'button',
+        text: { type: 'plain_text', text: '🗺️ 지도에서 보기' },
+        url: mapUrl,
+        action_id: 'open_map_view',
+        style: 'primary',
+      }],
+    });
+  }
+  result.push(footer());
+  return result;
 }
 
 // 리뷰 작성 Modal

@@ -5,7 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const { App, ExpressReceiver } = require('@slack/bolt');
 const express = require('express');
-const { pool } = require('./db/queries');
+const db = require('./db/queries');
+const { pool } = db;
 const commands = require('./handlers/commands');
 const modals = require('./handlers/modals');
 
@@ -46,6 +47,25 @@ if (useSocketMode) {
 // 헬스체크
 expressApp.get('/', (_req, res) => res.send('🍚 망원밥 by 몬스테라하우스 — 정상 작동 중'));
 expressApp.get('/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+
+// 지도 뷰 — 카카오맵 JS SDK로 식당 마커 표시
+expressApp.get('/map', (_req, res) => {
+  const key = process.env.KAKAO_JS_API_KEY || '';
+  const html = fs.readFileSync(path.join(__dirname, '../public/map.html'), 'utf8')
+    .replace('__KAKAO_JS_KEY__', key);
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
+// 지도 뷰 데이터 API
+expressApp.get('/api/restaurants', async (_req, res) => {
+  try {
+    const list = await db.listAllRestaurantsWithStatus();
+    res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // 핸들러 등록
 commands.register(app);

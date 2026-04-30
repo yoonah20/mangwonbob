@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🍚 망원밥 — 탐험 지도</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, 'Apple SD Gothic Neo', 'Pretendard', sans-serif; }
+  #app { display: flex; height: 100vh; }
+  #sidebar {
+    width: 320px; min-width: 320px; background: #fafaf7; border-right: 1px solid #e5e5e5;
+    display: flex; flex-direction: column;
+  }
+  #sidebar header { padding: 16px; border-bottom: 1px solid #e5e5e5; }
+  #sidebar header h1 { margin: 0; font-size: 18px; }
+  #sidebar header .stat { font-size: 13px; color: #666; margin-top: 4px; }
+  #search { width: 100%; padding: 8px 10px; margin-top: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+  #list { flex: 1; overflow-y: auto; }
+  .item {
+    padding: 12px 16px; border-bottom: 1px solid #eee; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .item:hover { background: #f0efe8; }
+  .item.active { background: #e8f5e9; }
+  .item .name { font-weight: 600; font-size: 14px; }
+  .item .meta { font-size: 12px; color: #666; margin-top: 2px; }
+  .item .status { font-size: 11px; margin-top: 4px; }
+  .item .status.disc { color: #f59e0b; }
+  .item .status.unk { color: #94a3b8; }
+  #map { flex: 1; }
+  footer {
+    padding: 8px 16px; border-top: 1px solid #e5e5e5; font-size: 11px; color: #999;
+    background: #fff; text-align: center;
+  }
+  .empty { padding: 30px; text-align: center; color: #999; }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <header>
+      <h1>🍚 망원밥 탐험 지도</h1>
+      <div class="stat" id="stat">불러오는 중…</div>
+      <input id="search" type="text" placeholder="🔍 식당 / 카테고리 검색">
+    </header>
+    <div id="list"><div class="empty">로딩 중…</div></div>
+    <footer>🌿 by 몬스테라하우스</footer>
+  </aside>
+  <div id="map"></div>
+</div>
+
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_JS_KEY__&autoload=false"></script>
+<script>
+const OFFICE = { y: 37.5548733, x: 126.9094692 };
+let map, markers = [], infos = [], restaurants = [];
+
+kakao.maps.load(async () => {
+  map = new kakao.maps.Map(document.getElementById('map'), {
+    center: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
+    level: 4,
+  });
+
+  // 회사 마커
+  new kakao.maps.Marker({
+    position: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
+    map,
+    image: makeMarker('#10b981', '🏢', 36),
+    title: '몬스테라하우스',
+  });
+
+  // 500m 반경 표시
+  new kakao.maps.Circle({
+    center: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
+    radius: 500,
+    strokeWeight: 1, strokeColor: '#10b981', strokeOpacity: 0.4,
+    fillColor: '#10b981', fillOpacity: 0.05,
+  }).setMap(map);
+
+  const res = await fetch('/api/restaurants');
+  restaurants = await res.json();
+  renderAll();
+  document.getElementById('search').addEventListener('input', renderAll);
+});
+
+function renderAll() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  const filtered = restaurants.filter(r =>
+    !q || r.name.toLowerCase().includes(q) || (r.category || '').toLowerCase().includes(q)
+  );
+
+  // 마커 정리
+  markers.forEach(m => m.setMap(null));
+  markers = []; infos = [];
+
+  // 마커 추가
+  filtered.forEach((r, idx) => {
+    const isDisc = r.discovered;
+    const color = isDisc ? '#f59e0b' : '#cbd5e1';
+    const marker = new kakao.maps.Marker({
+      position: new kakao.maps.LatLng(r.latitude, r.longitude),
+      map,
+      image: makeMarker(color, '', 22),
+      title: r.name,
+    });
+    const ratingLine = r.avg_rating
+      ? `⭐ ${r.avg_rating} · ${r.visit_count}회 방문`
+      : '🌫️ 아직 미탐험';
+    const info = new kakao.maps.InfoWindow({
+      content: `<div style="padding:10px;font-size:13px;min-width:160px;line-height:1.5">
+        <div style="font-weight:600">${isDisc ? '✅' : '🌫️'} ${escapeHtml(r.name)}</div>
+        <div style="color:#666">${escapeHtml(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
+        <div style="color:#666;margin-top:4px">${ratingLine}</div>
+        <a href="${r.kakao_url}" target="_blank" style="color:#3b82f6;font-size:12px">카카오맵 →</a>
+      </div>`,
+    });
+    kakao.maps.event.addListener(marker, 'click', () => {
+      infos.forEach(i => i.close());
+      info.open(map, marker);
+      highlightItem(idx);
+    });
+    markers.push(marker); infos.push(info);
+  });
+
+  // 리스트 렌더
+  const list = document.getElementById('list');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">검색 결과 없음</div>';
+  } else {
+    list.innerHTML = filtered.map((r, idx) => {
+      const isDisc = r.discovered;
+      const status = isDisc
+        ? `<span class="status disc">✅ 탐험 완료${r.avg_rating ? ' · ⭐ ' + r.avg_rating : ''}</span>`
+        : `<span class="status unk">🌫️ 미탐험</span>`;
+      return `<div class="item" data-idx="${idx}">
+        <div class="name">${escapeHtml(r.name)}</div>
+        <div class="meta">${escapeHtml(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
+        ${status}
+      </div>`;
+    }).join('');
+    list.querySelectorAll('.item').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.idx, 10);
+        const r = filtered[idx];
+        map.panTo(new kakao.maps.LatLng(r.latitude, r.longitude));
+        infos.forEach(i => i.close());
+        infos[idx].open(map, markers[idx]);
+        highlightItem(idx);
+      });
+    });
+  }
+
+  // 통계
+  const total = restaurants.length;
+  const disc = restaurants.filter(r => r.discovered).length;
+  document.getElementById('stat').textContent =
+    `🗺️ ${disc} / ${total}곳 탐험 완료` + (q ? ` (검색: ${filtered.length}개)` : '');
+}
+
+function highlightItem(idx) {
+  document.querySelectorAll('#list .item').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+  const target = document.querySelector(`#list .item[data-idx="${idx}"]`);
+  if (target) target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function makeMarker(color, emoji, size) {
+  const text = emoji
+    ? `<text x="50%" y="55%" text-anchor="middle" font-size="${size * 0.5}" dominant-baseline="middle">${emoji}</text>`
+    : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 2}" fill="${color}" stroke="white" stroke-width="2"/>
+    ${text}
+  </svg>`;
+  return new kakao.maps.MarkerImage(
+    'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg))),
+    new kakao.maps.Size(size, size)
+  );
+}
+
+function formatDist(m) {
+  if (!m && m !== 0) return '';
+  return `도보 ${Math.max(1, Math.round(m / 80))}분`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>

@@ -263,6 +263,19 @@ async function getRegularKing(limit = 5) {
   return rows;
 }
 
+// 모든 식당 + 상태 (지도 뷰용)
+async function listAllRestaurantsWithStatus() {
+  const { rows } = await q(
+    `SELECT r.*,
+       EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id) AS discovered,
+       (SELECT ROUND(AVG(rating)::numeric, 1) FROM reviews WHERE restaurant_id = r.id) AS avg_rating,
+       (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id)::int AS visit_count
+     FROM restaurants r
+     ORDER BY r.distance_from_office ASC`
+  );
+  return rows;
+}
+
 module.exports = {
   pool,
   q,
@@ -274,6 +287,7 @@ module.exports = {
   listDiscoveredRestaurants,
   listUnknownRestaurants,
   listRecommendedRestaurants,
+  listAllRestaurantsWithStatus,
   addVisit,
   countUserVisits,
   addReview,
