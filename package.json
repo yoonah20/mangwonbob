@@ -1,0 +1,23 @@
+{
+  "name": "mangwonbob",
+  "version": "1.0.0",
+  "description": "🍚 망원밥 — 몬스테라하우스 직원을 위한 슬랙 식당 탐험 RPG 봇",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js",
+    "collect": "node scripts/collect-restaurants.js",
+    "init-db": "psql $DATABASE_URL -f src/db/schema.sql"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "@slack/bolt": "^3.21.0",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.12.0"
+  }
+}
