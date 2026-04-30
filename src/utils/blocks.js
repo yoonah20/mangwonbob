@@ -93,7 +93,7 @@ function restaurantBlocks(r, comment) {
     : unknownRestaurantBlocks(r, comment);
 }
 
-// /망원밥 응답 — 탐험 현황 + 추천 3곳
+// /밥 응답 — 탐험 현황 + 추천 3곳
 function homeBlocks({ teamProgress, recommendations }) {
   const ratio = teamProgress.total ? teamProgress.discovered / teamProgress.total : 0;
   const blocks = [
@@ -160,7 +160,7 @@ function visitConfirmBlocks(restaurant, { isFirstDiscoverer, userVisitCount, isR
   ];
 }
 
-// /망원밥 탐험 — 개인 현황
+// /밥 탐험 — 개인 현황
 function explorationBlocks(userId, exp) {
   const ratio = exp.totalRestaurants ? exp.discoveredCount / exp.totalRestaurants : 0;
   const firstNames = exp.firstDiscoveries.slice(0, 5).map(r => r.name).join(', ') || '아직 없음';
@@ -183,7 +183,7 @@ function explorationBlocks(userId, exp) {
   ];
 }
 
-// /망원밥 지도 — 팀 전체 현황
+// /밥 지도 — 팀 전체 현황
 function teamMapBlocks(team) {
   const ratio = team.total ? team.discovered / team.total : 0;
   const lines = [

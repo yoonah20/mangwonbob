@@ -1,4 +1,4 @@
-// /망원밥 슬래시 커맨드 라우팅
+// /밥 슬래시 커맨드 라우팅
 const db = require('../db/queries');
 const restaurantSvc = require('../services/restaurant');
 const reviewSvc = require('../services/review');
@@ -28,8 +28,8 @@ function parseCommand(text) {
 }
 
 function register(app) {
-  // ─── /망원밥 ──────────────────────────────────────────
-  app.command('/망원밥', async ({ command, ack, respond, client }) => {
+  // ─── /밥 ──────────────────────────────────────────
+  app.command('/밥', async ({ command, ack, respond, client }) => {
     await ack();
     const parsed = parseCommand(command.text);
 
@@ -165,7 +165,7 @@ async function renderSearch(name) {
   };
 }
 
-// /망원밥 방문 [식당명] — 즉시 방문 기록 + 리뷰 모달 유도
+// /밥 방문 [식당명] — 즉시 방문 기록 + 리뷰 모달 유도
 async function handleVisit({ name, command, client, respond }) {
   const r = await restaurantSvc.findByName(name);
   if (!r) {
@@ -192,7 +192,7 @@ async function handleVisit({ name, command, client, respond }) {
   });
 }
 
-// /망원밥 리뷰 [식당명] — 리뷰 모달 오픈
+// /밥 리뷰 [식당명] — 리뷰 모달 오픈
 async function handleReviewOpen({ name, command, client, respond }) {
   const r = await restaurantSvc.findByName(name);
   if (!r) {
