@@ -22,7 +22,7 @@
 - Slack Bolt SDK (Socket Mode 권장)
 - PostgreSQL
 - Kakao 로컬 API (FD6 음식점 카테고리)
-- Anthropic Claude API (`claude-haiku-4-5`) — 추천 코멘트 생성
+- DeepSeek API (`deepseek-chat`) — 추천 코멘트 생성
 - Railway 배포
 
 ---
@@ -36,7 +36,7 @@
     modals.js        # 리뷰 작성 Modal 처리
   /services
     kakao.js         # 카카오 로컬 API 연동
-    claude.js        # Claude 추천 코멘트
+    deepseek.js      # DeepSeek 추천 코멘트
     restaurant.js    # 식당 조회/상태 관리
     review.js        # 방문/리뷰 기록
     ranking.js       # 탐험 순위 집계
@@ -100,6 +100,18 @@ npm run dev
 
 ---
 
+## 🤖 DeepSeek API 키 발급
+
+1. <https://platform.deepseek.com> 접속 → 회원가입/로그인
+2. **API Keys** 메뉴에서 **Create new API key**
+3. 발급된 키를 `.env` 의 `DEEPSEEK_API_KEY` 에 붙여넣기
+4. (선택) 다른 모델 사용 시 `DEEPSEEK_MODEL` 로 오버라이드 (기본값 `deepseek-chat`)
+
+> DeepSeek은 OpenAI 호환 인터페이스라 별도 SDK 없이 `axios` 로 호출합니다.
+> 키가 없으면 별점 기반 폴백 코멘트로 동작하므로 봇 자체는 그대로 작동합니다.
+
+---
+
 ## 💬 Slack App 생성
 
 ### 1. Slack App 만들기
@@ -146,7 +158,7 @@ npm run dev
    - `SLACK_SIGNING_SECRET`
    - `SLACK_APP_TOKEN`
    - `KAKAO_REST_API_KEY`
-   - `ANTHROPIC_API_KEY`
+   - `DEEPSEEK_API_KEY`
 5. 첫 배포 후 한 번만 실행:
    ```bash
    # Railway 셸(또는 로컬에서 DATABASE_URL을 export 한 뒤)
@@ -174,5 +186,5 @@ npm run dev
 
 - 팀 동기부여를 위해 첫 발견 알림은 **채널 공개**, 그 외는 ephemeral.
 - 미탐험 식당은 정보를 의도적으로 가려서 "탐험 동기"를 만든다.
-- Claude의 추천 코멘트는 30자 이내 짧고 친근한 톤으로 고정.
+- DeepSeek의 추천 코멘트는 30자 이내 짧고 친근한 톤으로 고정.
 - 모든 메시지 푸터에 `🌿 망원밥 by 몬스테라하우스` 브랜딩 유지.

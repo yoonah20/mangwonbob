@@ -1,15 +1,21 @@
-// Anthropic Claude API — 추천 한 줄 코멘트 생성
-const Anthropic = require('@anthropic-ai/sdk');
+// DeepSeek API — 추천 한 줄 코멘트 생성 (OpenAI 호환 인터페이스)
+const axios = require('axios');
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1';
+const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+
+const client = axios.create({
+  baseURL: BASE_URL,
+  timeout: 10_000,
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+  },
 });
-
-const MODEL = 'claude-haiku-4-5-20251001';
 
 // 식당 1곳에 대한 한 줄 추천 코멘트 생성
 async function generateRecommendation(restaurant, opts = {}) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.DEEPSEEK_API_KEY) {
     return defaultComment(restaurant, opts);
   }
 
@@ -29,18 +35,20 @@ ${sampleComment ? `최근 리뷰: "${sampleComment}"` : ''}
 규칙:
 - 30자 이내, 친근한 반말
 - 이모지 1개만 사용
-- 과장 금지, 식당 이름 다시 쓰지 말 것`;
+- 과장 금지, 식당 이름 다시 쓰지 말 것
+- 한 줄만 출력 (따옴표 없이)`;
 
   try {
-    const res = await client.messages.create({
+    const { data } = await client.post('/chat/completions', {
       model: MODEL,
-      max_tokens: 100,
       messages: [{ role: 'user', content: prompt }],
+      max_tokens: 80,
+      temperature: 0.8,
     });
-    const text = res.content?.[0]?.text?.trim();
+    const text = data?.choices?.[0]?.message?.content?.trim();
     return text || defaultComment(restaurant, opts);
   } catch (e) {
-    console.error('Claude API 오류:', e.message);
+    console.error('DeepSeek API 오류:', e.response?.data || e.message);
     return defaultComment(restaurant, opts);
   }
 }

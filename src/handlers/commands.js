@@ -3,7 +3,7 @@ const db = require('../db/queries');
 const restaurantSvc = require('../services/restaurant');
 const reviewSvc = require('../services/review');
 const rankingSvc = require('../services/ranking');
-const claude = require('../services/claude');
+const deepseek = require('../services/deepseek');
 const blocks = require('../utils/blocks');
 
 const CATEGORIES = ['한식', '일식', '중식', '양식', '카페', '분식', '아시아', '치킨'];
@@ -113,7 +113,7 @@ async function renderHome(category) {
   const enriched = await Promise.all(
     recommendations.filter(Boolean).map(async (r) => ({
       restaurant: r,
-      comment: await claude.generateRecommendation(r, {
+      comment: await deepseek.generateRecommendation(r, {
         discovered: r.discovered,
         avgRating: r.avgRating,
         reviewCount: r.reviewCount,
@@ -152,7 +152,7 @@ async function renderSearch(name) {
   if (!r) {
     return { text: `🔍 "${name}" 와(과) 일치하는 식당을 찾지 못했어요.` };
   }
-  const comment = await claude.generateRecommendation(r, {
+  const comment = await deepseek.generateRecommendation(r, {
     discovered: r.discovered,
     avgRating: r.avgRating,
     reviewCount: r.reviewCount,
