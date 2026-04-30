@@ -7,7 +7,7 @@
     "start": "node src/app.js",
     "dev": "node --watch src/app.js",
     "collect": "node scripts/collect-restaurants.js",
-    "init-db": "psql $DATABASE_URL -f src/db/schema.sql"
+    "init-db": "node scripts/init-db.js"
   },
   "engines": {
     "node": ">=18"
