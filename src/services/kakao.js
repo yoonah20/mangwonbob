@@ -35,7 +35,7 @@ async function searchByCategory(radius = 1000, page = 1, size = 15) {
 }
 
 // is_end가 될 때까지 모든 페이지 수집
-async function collectAllRestaurants(radius = 1000) {
+async function collectAllRestaurants(radius = 500) {
   const all = [];
   let page = 1;
   while (true) {

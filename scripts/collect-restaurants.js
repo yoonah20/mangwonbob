@@ -15,7 +15,7 @@ async function main() {
   }
 
   console.log('🔍 카카오 로컬 API로 망원동 회사 반경 1km 음식점 수집 중...');
-  const docs = await kakao.collectAllRestaurants(1000);
+  const docs = await kakao.collectAllRestaurants(500);
   console.log(`📦 ${docs.length}개 식당 수신`);
 
   // kakao_place_id 기준 중복 제거
