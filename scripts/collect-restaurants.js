@@ -14,7 +14,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('🔍 카카오 로컬 API로 망원동 회사 반경 1km 음식점 수집 중...');
+  console.log('🔍 카카오 로컬 API로 망원동 회사 반경 500m 음식점 수집 중...');
   const docs = await kakao.collectAllRestaurants(500);
   console.log(`📦 ${docs.length}개 식당 수신`);
 
