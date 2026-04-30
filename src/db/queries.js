@@ -1,9 +1,15 @@
 // PostgreSQL 연결 풀 + 쿼리 모음
 const { Pool } = require('pg');
 
+// railway.internal은 Railway 컨테이너 내부 전용 — 로컬에서는 PUBLIC URL 사용
+const rawUrl = process.env.DATABASE_URL || '';
+const connectionString = rawUrl.includes('railway.internal')
+  ? (process.env.DATABASE_PUBLIC_URL || rawUrl)
+  : rawUrl;
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('railway') || process.env.NODE_ENV === 'production'
+  connectionString,
+  ssl: connectionString.includes('railway') || process.env.NODE_ENV === 'production'
     ? { rejectUnauthorized: false }
     : false,
 });
