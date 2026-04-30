@@ -1,10 +1,20 @@
 // 망원밥 메인 서버 — Slack Bolt (Socket Mode) + Express 헬스체크
 require('dotenv').config();
 
+const fs = require('fs');
+const path = require('path');
 const { App, ExpressReceiver } = require('@slack/bolt');
 const express = require('express');
+const { pool } = require('./db/queries');
 const commands = require('./handlers/commands');
 const modals = require('./handlers/modals');
+
+// 앱 시작 시 스키마 자동 적용 (IF NOT EXISTS라 멱등)
+async function initDb() {
+  const sql = fs.readFileSync(path.join(__dirname, 'db/schema.sql'), 'utf8');
+  await pool.query(sql);
+  console.log('✅ DB 스키마 확인 완료');
+}
 
 const useSocketMode = !!process.env.SLACK_APP_TOKEN;
 
@@ -47,6 +57,7 @@ app.error(async (err) => {
 });
 
 (async () => {
+  await initDb();
   const port = process.env.PORT || 3000;
   if (useSocketMode) {
     await app.start();
