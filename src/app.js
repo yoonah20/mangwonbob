@@ -57,6 +57,12 @@ expressApp.get('/map', (_req, res) => {
   res.send(html);
 });
 
+// 키 주입 확인용 (앞 6자만 노출)
+expressApp.get('/debug/map-key', (_req, res) => {
+  const key = process.env.KAKAO_JS_API_KEY || '';
+  res.json({ key_set: !!key, key_preview: key ? key.slice(0, 6) + '…' : '(없음)' });
+});
+
 // 지도 뷰 데이터 API
 expressApp.get('/api/restaurants', async (_req, res) => {
   try {

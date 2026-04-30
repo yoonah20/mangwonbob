@@ -55,6 +55,12 @@
 const OFFICE = { y: 37.5548733, x: 126.9094692 };
 let map, markers = [], infos = [], restaurants = [];
 
+// SDK 로드 실패 감지
+window.onerror = (msg, src) => {
+  document.getElementById('list').innerHTML =
+    `<div class="empty" style="color:red">❌ 지도 로드 실패<br>${msg}<br><br>카카오 앱 JavaScript 키와 도메인 등록을 확인하세요.</div>`;
+};
+
 kakao.maps.load(async () => {
   map = new kakao.maps.Map(document.getElementById('map'), {
     center: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
