@@ -17,11 +17,7 @@
   #sidebar header h1 { margin: 0; font-size: 18px; }
   #sidebar header .stat { font-size: 13px; color: #666; margin-top: 4px; }
   #sidebar header .who { font-size: 12px; color: #10b981; margin-top: 4px; font-weight: 600; }
-  #badges {
-    display: flex; gap: 4px; margin-top: 8px; overflow-x: auto;
-    -webkit-overflow-scrolling: touch; scrollbar-width: none;
-    width: 100%; max-width: 100%; min-width: 0;
-  }
+  #badges { display: none; }
   #badges::-webkit-scrollbar { display: none; }
   .badge-chip {
     flex: 0 0 auto; padding: 3px 8px; font-size: 11px;
@@ -383,12 +379,10 @@ let hiddenRestaurants = [];
 
 async function loadRestaurants() {
   const url = USER.id ? `/api/restaurants?user=${encodeURIComponent(USER.id)}` : '/api/restaurants';
-  const badgesUrl = USER.id ? `/api/badges?user=${encodeURIComponent(USER.id)}` : null;
-  const [restRes, meetRes, hiddenRes, badgesRes] = await Promise.all([
+  const [restRes, meetRes, hiddenRes] = await Promise.all([
     fetch(url),
     fetch('/api/meetups'),
     fetch('/api/hidden'),
-    badgesUrl ? fetch(badgesUrl) : Promise.resolve(null),
   ]);
   restaurants = await restRes.json();
   const meetups = await meetRes.json();
@@ -400,16 +394,6 @@ async function loadRestaurants() {
   }
   for (const r of restaurants) {
     r.meetups = grouped[r.id] || [];
-  }
-  // 뱃지 업데이트
-  if (badgesRes) {
-    try {
-      const data = await badgesRes.json();
-      const el = document.getElementById('badges');
-      el.innerHTML = (data.badges || []).map(b =>
-        `<span class="badge-chip" title="${esc(b.sub)}">${b.emoji} ${esc(b.label)}</span>`
-      ).join('');
-    } catch {}
   }
   renderCatChips();
   renderAll();
@@ -1182,11 +1166,11 @@ function getMarkerStyle(r) {
   const visits = r.visit_count || 0;
 
   // 기본 (탐험 완료)
-  let style = { color: '#f59e0b', size: 28, emoji: categoryEmoji(r.category), glow: false, ring: null, hollow: false };
+  let style = { color: '#f59e0b', size: 34, emoji: categoryEmoji(r.category), glow: false, ring: null, hollow: false };
   // 단골 인기 (10회+)
-  if (visits >= 10) { style.size = 36; style.color = '#ef4444'; style.glow = true; style.ring = '🔥'; }
+  if (visits >= 10) { style.size = 44; style.color = '#ef4444'; style.glow = true; style.ring = '🔥'; }
   // 별점 우수 (4.5+)
-  if (rating >= 4.5 && visits >= 3) { style.size = Math.max(style.size, 34); style.glow = true; style.ring = '⭐'; }
+  if (rating >= 4.5 && visits >= 3) { style.size = Math.max(style.size, 40); style.glow = true; style.ring = '⭐'; }
   return style;
 }
 
