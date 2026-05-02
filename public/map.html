@@ -85,6 +85,24 @@
   .iw .badge.hot { background: #fee2e2; color: #dc2626; }
   .iw .badge.star { background: #fef3c7; color: #d97706; }
   .iw .actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .iw .review-quote {
+    margin-top: 8px; padding: 8px 10px; background: #fffaf0;
+    border-left: 3px solid #f59e0b; border-radius: 4px;
+    font-size: 12px; line-height: 1.5; color: #555;
+  }
+  .iw .review-quote .who { color: #888; font-size: 11px; margin-top: 2px; display: block; }
+  .iw .review-more {
+    display: inline-block; margin-top: 6px; font-size: 11px; color: #3b82f6;
+    cursor: pointer; text-decoration: underline;
+  }
+  .iw .review-list { margin-top: 8px; max-height: 200px; overflow-y: auto; }
+  .iw .review-item {
+    padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px; line-height: 1.5;
+  }
+  .iw .review-item:last-child { border-bottom: none; }
+  .iw .review-item .stars { color: #f59e0b; }
+  .iw .review-item .who { color: #888; font-size: 11px; }
+  .iw .review-item .tags { color: #94a3b8; font-size: 11px; margin-left: 4px; }
   .iw .nearby { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #ddd; }
   .iw .nearby-title { font-size: 11px; color: #888; margin-bottom: 4px; }
   .iw .nearby-item {
@@ -494,6 +512,21 @@ function buildInfoContent(r) {
   const meLine = myCount > 0
     ? `<div class="meta" style="color:#10b981">🥾 내가 ${myCount}회 방문</div>` : '';
 
+  // 샘플 리뷰 인용 (랜덤 1개) + 더 보기
+  let reviewQuote = '';
+  const reviewCount = r.review_count || 0;
+  if (r.sample_review && r.sample_review.comment) {
+    const sr = r.sample_review;
+    const stars = '⭐'.repeat(sr.rating || 0);
+    reviewQuote = `<div class="review-quote">
+      💬 "${esc(sr.comment)}"
+      <span class="who">${stars} — ${esc(sr.user_name || '익명')}</span>
+    </div>`;
+  }
+  const moreLink = reviewCount > (r.sample_review ? 1 : 0)
+    ? `<a class="review-more" onclick="showAllReviews(${r.id})">리뷰 ${reviewCount}개 모두 보기</a>` : '';
+  const reviewsContainer = `<div id="reviews-${r.id}"></div>`;
+
   // 같은 위치(15m 이내) 다른 가게
   const nearby = restaurants.filter(o =>
     o.id !== r.id &&
@@ -529,8 +562,36 @@ function buildInfoContent(r) {
       ${canAct ? `<button class="danger" onclick="hideRestaurant(${r.id}, this)">⛔ 퇴출</button>` : ''}
     </div>
     <div class="toast" id="toast-${r.id}"></div>
+    ${reviewQuote}
+    ${moreLink}
+    ${reviewsContainer}
     ${nearbyHtml}
   </div>`;
+}
+
+// 식당 전체 리뷰 보기
+async function showAllReviews(restaurantId) {
+  const target = document.getElementById('reviews-' + restaurantId);
+  const more = document.querySelector(`[onclick="showAllReviews(${restaurantId})"]`);
+  if (!target) return;
+  target.innerHTML = '<div style="font-size:11px;color:#888;padding:6px 0">불러오는 중…</div>';
+  if (more) more.style.display = 'none';
+  try {
+    const res = await fetch(`/api/reviews/${restaurantId}`);
+    const reviews = await res.json();
+    if (!reviews.length) {
+      target.innerHTML = '<div style="font-size:12px;color:#888">아직 리뷰가 없어요</div>';
+      return;
+    }
+    target.innerHTML = `<div class="review-list">${reviews.map(rv => `
+      <div class="review-item">
+        <div><span class="stars">${'⭐'.repeat(rv.rating || 0)}</span>${rv.comment ? ' "' + esc(rv.comment) + '"' : ''}</div>
+        <div class="who">— ${esc(rv.slack_user_name || '익명')}${rv.tags && rv.tags.length ? '<span class="tags">' + rv.tags.join(' ') + '</span>' : ''}</div>
+      </div>`).join('')}</div>`;
+  } catch (e) {
+    target.innerHTML = '<div style="color:#dc2626;font-size:12px">불러오기 실패</div>';
+    if (more) more.style.display = '';
+  }
 }
 
 // 다른 가게로 이동

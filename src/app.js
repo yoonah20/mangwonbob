@@ -67,6 +67,16 @@ expressApp.get('/debug/map-key', (_req, res) => {
   res.json({ key_set: !!key, key_preview: key ? key.slice(0, 6) + '…' : '(없음)' });
 });
 
+// 식당 1곳의 리뷰 전체
+expressApp.get('/api/reviews/:id', async (req, res) => {
+  try {
+    const list = await db.listReviews(parseInt(req.params.id, 10));
+    res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 지도 뷰 데이터 API (user 쿼리로 본인 방문 여부 표시)
 expressApp.get('/api/restaurants', async (req, res) => {
   try {

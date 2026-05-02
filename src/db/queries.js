@@ -221,6 +221,16 @@ async function getLatestReview(restaurantId) {
   return rows[0];
 }
 
+async function listReviews(restaurantId) {
+  const { rows } = await q(
+    `SELECT id, slack_user_id, slack_user_name, rating, comment, tags, created_at
+     FROM reviews WHERE restaurant_id = $1
+     ORDER BY created_at DESC`,
+    [restaurantId]
+  );
+  return rows;
+}
+
 async function getRestaurantTags(restaurantId) {
   const { rows } = await q(
     `SELECT DISTINCT UNNEST(tags) AS tag FROM reviews WHERE restaurant_id = $1`,
@@ -325,7 +335,13 @@ async function listAllRestaurantsWithStatus(userId = null) {
   const sql = `SELECT r.*,
        EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id) AS discovered,
        (SELECT ROUND(AVG(rating)::numeric, 1) FROM reviews WHERE restaurant_id = r.id) AS avg_rating,
-       (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id)::int AS visit_count
+       (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id)::int AS visit_count,
+       (SELECT COUNT(*) FROM reviews WHERE restaurant_id = r.id)::int AS review_count,
+       (SELECT json_build_object('rating', rating, 'comment', comment, 'tags', tags,
+         'user_name', slack_user_name)
+        FROM reviews
+        WHERE restaurant_id = r.id AND comment IS NOT NULL AND comment != ''
+        ORDER BY RANDOM() LIMIT 1) AS sample_review
        ${meCols}
      FROM restaurants r
      WHERE COALESCE(r.hidden, FALSE) = FALSE
@@ -358,6 +374,7 @@ module.exports = {
   countUserVisits,
   addReview,
   getLatestReview,
+  listReviews,
   getRestaurantTags,
   getUserStats,
   getUserFirstDiscoveries,
