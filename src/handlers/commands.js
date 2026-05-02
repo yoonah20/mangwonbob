@@ -36,11 +36,11 @@ function register(app) {
     try {
       switch (parsed.type) {
         case 'home':
-          return respond(await renderHome(parsed.category, command.user_id, command.user_name));
+          return respond(await renderHome(parsed.category, command.user_id, command.user_name, command.channel_id));
         case 'exploration':
           return respond(await renderExploration(command.user_id));
         case 'map':
-          return respond(await renderMap(command.user_id, command.user_name));
+          return respond(await renderMap(command.user_id, command.user_name, command.channel_id));
         case 'visit':
           return handleVisit({ name: parsed.name, command, client, respond });
         case 'review':
@@ -107,7 +107,7 @@ function register(app) {
 
 // ─── 화면 렌더링 ──────────────────────────────────────
 
-async function renderHome(category, userId, userName) {
+async function renderHome(category, userId, userName, channelId) {
   const teamProgress = await db.getTeamProgress();
   const recommendations = await restaurantSvc.getRecommendations(category, 3);
 
@@ -126,14 +126,18 @@ async function renderHome(category, userId, userName) {
   return {
     response_type: 'ephemeral',
     text: '🍚 오늘의 망원밥',
-    blocks: blocks.homeBlocks({ teamProgress, recommendations: enriched, mapUrl: buildMapUrl(userId, userName) }),
+    blocks: blocks.homeBlocks({ teamProgress, recommendations: enriched, mapUrl: buildMapUrl(userId, userName, channelId) }),
   };
 }
 
-function buildMapUrl(userId, userName) {
+function buildMapUrl(userId, userName, channelId) {
   if (!process.env.PUBLIC_URL) return null;
   const base = process.env.PUBLIC_URL.replace(/\/$/, '');
-  const params = new URLSearchParams({ user: userId || '', name: userName || '' });
+  const params = new URLSearchParams({
+    user: userId || '',
+    name: userName || '',
+    channel: channelId || '',
+  });
   return `${base}/map?${params.toString()}`;
 }
 
@@ -146,12 +150,12 @@ async function renderExploration(userId) {
   };
 }
 
-async function renderMap(userId, userName) {
+async function renderMap(userId, userName, channelId) {
   const team = await rankingSvc.getTeamMap();
   return {
     response_type: 'ephemeral',
     text: '🗺️ 팀 탐험 지도',
-    blocks: blocks.teamMapBlocks(team, buildMapUrl(userId, userName)),
+    blocks: blocks.teamMapBlocks(team, buildMapUrl(userId, userName, channelId)),
   };
 }
 

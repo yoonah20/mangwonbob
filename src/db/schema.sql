@@ -52,3 +52,29 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 CREATE INDEX IF NOT EXISTS idx_reviews_restaurant ON reviews(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(slack_user_id);
+
+-- 점심 메이트 모집 (지도에서 생성, 슬랙 채널에 공지)
+CREATE TABLE IF NOT EXISTS meetups (
+  id SERIAL PRIMARY KEY,
+  restaurant_id INTEGER REFERENCES restaurants(id) ON DELETE CASCADE,
+  organizer_id VARCHAR NOT NULL,
+  organizer_name VARCHAR,
+  meet_at TIMESTAMP NOT NULL,         -- 약속 시간
+  note TEXT,
+  channel_id VARCHAR,                 -- Slack 채널 ID
+  message_ts VARCHAR,                 -- Slack 메시지 ts (업데이트용)
+  status VARCHAR DEFAULT 'open',      -- open / closed
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_meetups_restaurant ON meetups(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_meetups_active ON meetups(status, meet_at);
+
+CREATE TABLE IF NOT EXISTS meetup_participants (
+  id SERIAL PRIMARY KEY,
+  meetup_id INTEGER REFERENCES meetups(id) ON DELETE CASCADE,
+  slack_user_id VARCHAR NOT NULL,
+  slack_user_name VARCHAR,
+  joined_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(meetup_id, slack_user_id)
+);

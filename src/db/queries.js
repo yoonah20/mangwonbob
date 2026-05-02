@@ -239,6 +239,67 @@ async function getRestaurantTags(restaurantId) {
   return rows.map(r => r.tag);
 }
 
+// ─── 점심 모집 ────────────────────────────────────────
+async function createMeetup({ restaurantId, organizerId, organizerName, meetAt, note, channelId }) {
+  const { rows } = await q(
+    `INSERT INTO meetups (restaurant_id, organizer_id, organizer_name, meet_at, note, channel_id)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [restaurantId, organizerId, organizerName, meetAt, note || null, channelId || null]
+  );
+  return rows[0];
+}
+
+async function setMeetupMessageTs(meetupId, ts) {
+  await q(`UPDATE meetups SET message_ts = $1 WHERE id = $2`, [ts, meetupId]);
+}
+
+async function getMeetup(id) {
+  const { rows } = await q(`SELECT * FROM meetups WHERE id = $1`, [id]);
+  return rows[0];
+}
+
+async function joinMeetup(meetupId, userId, userName) {
+  await q(
+    `INSERT INTO meetup_participants (meetup_id, slack_user_id, slack_user_name)
+     VALUES ($1, $2, $3) ON CONFLICT (meetup_id, slack_user_id) DO NOTHING`,
+    [meetupId, userId, userName]
+  );
+}
+
+async function leaveMeetup(meetupId, userId) {
+  await q(
+    `DELETE FROM meetup_participants WHERE meetup_id = $1 AND slack_user_id = $2`,
+    [meetupId, userId]
+  );
+}
+
+async function listMeetupParticipants(meetupId) {
+  const { rows } = await q(
+    `SELECT slack_user_id, slack_user_name, joined_at FROM meetup_participants
+     WHERE meetup_id = $1 ORDER BY joined_at ASC`,
+    [meetupId]
+  );
+  return rows;
+}
+
+async function closeMeetup(meetupId) {
+  await q(`UPDATE meetups SET status = 'closed' WHERE id = $1`, [meetupId]);
+}
+
+// 식당별 활성 모집 (현재 시각 이후, status = open) — 지도용
+async function listActiveMeetupsByRestaurant() {
+  const { rows } = await q(
+    `SELECT m.id, m.restaurant_id, m.organizer_id, m.organizer_name,
+       m.meet_at, m.note, m.status,
+       (SELECT COUNT(*) FROM meetup_participants WHERE meetup_id = m.id)::int AS participant_count,
+       (SELECT array_agg(slack_user_id) FROM meetup_participants WHERE meetup_id = m.id) AS participant_ids
+     FROM meetups m
+     WHERE m.status = 'open' AND m.meet_at > NOW()
+     ORDER BY m.meet_at ASC`
+  );
+  return rows;
+}
+
 // ─── 개인 통계 ────────────────────────────────────────
 async function getUserStats(userId) {
   const { rows } = await q(
@@ -376,6 +437,14 @@ module.exports = {
   getLatestReview,
   listReviews,
   getRestaurantTags,
+  createMeetup,
+  setMeetupMessageTs,
+  getMeetup,
+  joinMeetup,
+  leaveMeetup,
+  listMeetupParticipants,
+  closeMeetup,
+  listActiveMeetupsByRestaurant,
   getUserStats,
   getUserFirstDiscoveries,
   getUserRegulars,

@@ -233,6 +233,57 @@ function teamMapBlocks(team, mapUrl) {
   return result;
 }
 
+// 점심 모집 Slack 메시지
+function meetupAnnounceBlocks({ meetup, restaurant, participants }) {
+  const time = new Date(meetup.meet_at);
+  const hh = time.getHours();
+  const mm = String(time.getMinutes()).padStart(2, '0');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const meetDay = new Date(time); meetDay.setHours(0,0,0,0);
+  const dayDiff = Math.round((meetDay - today) / (24*60*60*1000));
+  const dayLabel = dayDiff === 0 ? '오늘' : dayDiff === 1 ? '내일' : `${time.getMonth()+1}/${time.getDate()}`;
+  const timeStr = `${dayLabel} ${hh}:${mm}`;
+
+  const lines = [
+    `🍽️ *점심 모집!*`,
+    `${mention(meetup.organizer_id)}님이 *${restaurant.name}* (${restaurant.category}) 갈 사람 모집해요`,
+    `📅 ${timeStr}`,
+  ];
+  if (meetup.note) lines.push(`💬 _${meetup.note}_`);
+  lines.push('');
+  const participantMentions = participants.length
+    ? participants.map(p => mention(p.slack_user_id)).join(' ')
+    : '_아직 없음_';
+  lines.push(`✋ *참여 (${participants.length}명)*: ${participantMentions}`);
+
+  const result = [
+    { type: 'section', text: { type: 'mrkdwn', text: lines.join('\n') } },
+  ];
+  if (meetup.status === 'open') {
+    result.push({
+      type: 'actions',
+      elements: [
+        { type: 'button', style: 'primary',
+          text: { type: 'plain_text', text: '✋ 참여하기' },
+          action_id: 'join_meetup', value: String(meetup.id) },
+        { type: 'button',
+          text: { type: 'plain_text', text: '나갈래' },
+          action_id: 'leave_meetup', value: String(meetup.id) },
+        { type: 'button',
+          text: { type: 'plain_text', text: '🔒 모집 마감' },
+          action_id: 'close_meetup', value: String(meetup.id) },
+      ],
+    });
+  } else {
+    result.push({
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: '🔒 모집이 마감됐어요' }],
+    });
+  }
+  result.push(footer());
+  return result;
+}
+
 // 리뷰 작성 Modal
 function reviewModal(restaurant) {
   return {
@@ -308,5 +359,6 @@ module.exports = {
   explorationBlocks,
   teamMapBlocks,
   reviewModal,
+  meetupAnnounceBlocks,
   footer,
 };

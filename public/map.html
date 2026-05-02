@@ -103,7 +103,21 @@
   .iw .review-item .stars { color: #f59e0b; }
   .iw .review-item .who { color: #888; font-size: 11px; }
   .iw .review-item .tags { color: #94a3b8; font-size: 11px; margin-left: 4px; }
+  .iw .meetups { margin-top: 8px; padding: 8px 10px; background: #ecfdf5;
+    border-left: 3px solid #10b981; border-radius: 4px; }
+  .iw .meetup-item { font-size: 12px; line-height: 1.5; padding: 3px 0; display: flex;
+    justify-content: space-between; align-items: center; gap: 6px; }
+  .iw .meetup-item:not(:last-child) { border-bottom: 1px dashed #d1fae5; padding-bottom: 6px; margin-bottom: 4px; }
+  .iw .meetup-item .info { flex: 1; min-width: 0; }
+  .iw .meetup-item button { padding: 3px 8px; font-size: 11px; flex: 0 0 auto; }
   .iw .nearby { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #ddd; }
+  .time-options { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .time-options button {
+    flex: 0 0 auto; padding: 6px 12px; border: 1px solid #ddd; background: #fff;
+    border-radius: 999px; cursor: pointer; font-size: 13px;
+  }
+  .time-options button.selected { background: #10b981; color: #fff; border-color: #10b981; }
+  .time-options button.disabled { opacity: 0.4; cursor: not-allowed; }
   .iw .nearby-title { font-size: 11px; color: #888; margin-bottom: 4px; }
   .iw .nearby-item {
     display: inline-block; padding: 3px 8px; margin: 2px 3px 2px 0;
@@ -219,6 +233,28 @@
   <div id="map"></div>
 </div>
 
+<!-- 점심 모집 생성 모달 -->
+<div class="modal-bg" id="meetupModal">
+  <div class="modal">
+    <h2 id="meetupTitle">🍽️ 같이 가요</h2>
+    <label>약속 시간</label>
+    <div class="time-options" id="timeOptions">
+      <button data-time="11:30">오늘 11:30</button>
+      <button data-time="12:00">오늘 12:00</button>
+      <button data-time="12:30">오늘 12:30</button>
+      <button data-time="13:00">오늘 13:00</button>
+      <button data-time="custom">직접 입력</button>
+    </div>
+    <input type="datetime-local" id="meetupTimeCustom" style="margin-top:8px;width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;display:none">
+    <label>한마디 (선택)</label>
+    <textarea id="meetupNote" placeholder="점심특선 노려봅니다 / 빨리 먹고 와야 해요 등"></textarea>
+    <div class="actions">
+      <button onclick="closeMeetupModal()">취소</button>
+      <button class="primary" onclick="submitMeetup()">모집 시작 🚀</button>
+    </div>
+  </div>
+</div>
+
 <!-- 리뷰 작성 모달 -->
 <div class="modal-bg" id="reviewModal">
   <div class="modal">
@@ -256,9 +292,14 @@ function showError(msg) {
 <script>
 const OFFICE = { y: 37.5548733, x: 126.9094692 };
 const params = new URLSearchParams(location.search);
-const USER = { id: params.get('user') || '', name: params.get('name') || '' };
+const USER = {
+  id: params.get('user') || '',
+  name: params.get('name') || '',
+  channel: params.get('channel') || '',
+};
 let map, markers = [], infos = [], restaurants = [], openInfo = null;
 let reviewTarget = null, reviewRating = 0;
+let meetupTarget = null, meetupSelectedTime = null;
 let currentPreset = 'near', currentCat = null;
 
 if (USER.id) {
@@ -299,8 +340,20 @@ if (typeof kakao === 'undefined') {
 
 async function loadRestaurants() {
   const url = USER.id ? `/api/restaurants?user=${encodeURIComponent(USER.id)}` : '/api/restaurants';
-  const res = await fetch(url);
-  restaurants = await res.json();
+  const [restRes, meetRes] = await Promise.all([
+    fetch(url),
+    fetch('/api/meetups'),
+  ]);
+  restaurants = await restRes.json();
+  const meetups = await meetRes.json();
+  // 식당별 활성 모집 머지
+  const grouped = {};
+  for (const m of meetups) {
+    (grouped[m.restaurant_id] = grouped[m.restaurant_id] || []).push(m);
+  }
+  for (const r of restaurants) {
+    r.meetups = grouped[r.id] || [];
+  }
   renderCatChips();
   renderAll();
 }
@@ -484,6 +537,8 @@ function openMarker(idx) {
   infos[idx].open(map, markers[idx]);
   if (typeof infos[idx].setZIndex === 'function') infos[idx].setZIndex(999);
   openInfo = infos[idx];
+  const list = window._filtered || restaurants;
+  if (list[idx]) window._lastRestaurantId = list[idx].id;
   document.querySelectorAll('#list .item').forEach((el, i) => {
     el.classList.toggle('active', parseInt(el.dataset.idx, 10) === idx);
   });
@@ -549,15 +604,41 @@ function buildInfoContent(r) {
   const cancelBtn = canAct && myCount > 0
     ? `<button onclick="cancelVisit(${r.id}, this)">취소 ↩</button>` : '';
 
+  // 활성 모집 (있으면 InfoWindow 상단에 표시)
+  const meetups = r.meetups || [];
+  const meetupsHtml = meetups.length ? `
+    <div class="meetups">
+      ${meetups.map(m => {
+        const joined = m.participant_ids && m.participant_ids.includes(USER.id);
+        const btn = !canAct ? '' : (joined
+          ? `<button onclick="leaveMeetup(${m.id}, this)">나갈래</button>`
+          : `<button class="primary" onclick="joinMeetup(${m.id}, this)">참여</button>`);
+        return `<div class="meetup-item">
+          <div class="info">🍽️ <strong>${formatMeetTime(m.meet_at)}</strong>
+            ${esc(m.organizer_name || '익명')} 모집 (${m.participant_count}명)
+            ${m.note ? `<div style="font-size:11px;color:#666;margin-top:2px">"${esc(m.note)}"</div>` : ''}
+          </div>
+          ${btn}
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  // 같이 가요 버튼
+  const meetupBtn = canAct
+    ? `<button onclick="openMeetupModal(${r.id}, '${esc(r.name).replace(/'/g, "\\'")}')">🍽️ 같이 가요</button>`
+    : '';
+
   return `<div class="iw">
     <div class="title">${categoryEmoji(r.category)} ${esc(r.name)}${badges}</div>
     <div class="meta">${esc(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
     <div class="meta">${ratingLine}</div>
     ${meLine}
+    ${meetupsHtml}
     <div class="actions">
       ${canAct ? `<button class="primary" onclick="visit(${r.id}, this)">${visitLabel}</button>` : ''}
       ${cancelBtn}
       ${reviewBtn}
+      ${meetupBtn}
       <a class="btn" href="${r.kakao_url}" target="_blank">카카오맵 →</a>
       ${canAct ? `<button class="danger" onclick="hideRestaurant(${r.id}, this)">⛔ 퇴출</button>` : ''}
     </div>
@@ -567,6 +648,117 @@ function buildInfoContent(r) {
     ${reviewsContainer}
     ${nearbyHtml}
   </div>`;
+}
+
+// ───────── 점심 모집 ─────────
+function formatMeetTime(iso) {
+  const dt = new Date(iso);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const meetDay = new Date(dt); meetDay.setHours(0,0,0,0);
+  const dayDiff = Math.round((meetDay - today) / (24*60*60*1000));
+  const hh = dt.getHours();
+  const mm = String(dt.getMinutes()).padStart(2, '0');
+  if (dayDiff === 0) return `오늘 ${hh}:${mm}`;
+  if (dayDiff === 1) return `내일 ${hh}:${mm}`;
+  return `${dt.getMonth()+1}/${dt.getDate()} ${hh}:${mm}`;
+}
+
+function openMeetupModal(restaurantId, name) {
+  if (!USER.id) return alert('슬랙에서 /밥 으로 열어야 모집할 수 있어요');
+  if (!USER.channel) return alert('이 링크는 채널에 공지를 보낼 수 없어요. 슬랙 채널에서 /밥 을 다시 입력해주세요.');
+  meetupTarget = restaurantId;
+  meetupSelectedTime = null;
+  document.getElementById('meetupTitle').textContent = `🍽️ ${name} 같이 가요`;
+  document.getElementById('meetupNote').value = '';
+  document.getElementById('meetupTimeCustom').style.display = 'none';
+  document.getElementById('meetupTimeCustom').value = '';
+  // 과거 시간 비활성
+  const now = new Date();
+  document.querySelectorAll('#timeOptions button').forEach(b => {
+    b.classList.remove('selected', 'disabled');
+    if (b.dataset.time !== 'custom') {
+      const [h, m] = b.dataset.time.split(':').map(Number);
+      const slot = new Date(); slot.setHours(h, m, 0, 0);
+      if (slot <= now) b.classList.add('disabled');
+    }
+  });
+  document.getElementById('meetupModal').classList.add('show');
+}
+
+function closeMeetupModal() {
+  document.getElementById('meetupModal').classList.remove('show');
+}
+
+document.querySelectorAll('#timeOptions button').forEach(b => {
+  b.addEventListener('click', () => {
+    if (b.classList.contains('disabled')) return;
+    document.querySelectorAll('#timeOptions button').forEach(x => x.classList.remove('selected'));
+    b.classList.add('selected');
+    if (b.dataset.time === 'custom') {
+      document.getElementById('meetupTimeCustom').style.display = 'block';
+      meetupSelectedTime = 'custom';
+    } else {
+      document.getElementById('meetupTimeCustom').style.display = 'none';
+      const [h, m] = b.dataset.time.split(':').map(Number);
+      const dt = new Date(); dt.setHours(h, m, 0, 0);
+      meetupSelectedTime = dt.toISOString();
+    }
+  });
+});
+
+async function submitMeetup() {
+  let meetAt = meetupSelectedTime;
+  if (meetAt === 'custom') {
+    const v = document.getElementById('meetupTimeCustom').value;
+    if (!v) return alert('시간을 입력해주세요');
+    meetAt = new Date(v).toISOString();
+  }
+  if (!meetAt) return alert('시간을 선택해주세요');
+  const note = document.getElementById('meetupNote').value.trim();
+  try {
+    const res = await fetch('/api/meetups', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restaurantId: meetupTarget, userId: USER.id, userName: USER.name,
+        channelId: USER.channel, meetAt, note,
+      }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || '실패');
+    const id = meetupTarget;
+    closeMeetupModal();
+    await loadRestaurants();
+    reopenById(id);
+  } catch (e) { alert('실패: ' + e.message); }
+}
+
+async function joinMeetup(meetupId, btn) {
+  if (!USER.id) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/meetups/${meetupId}/join`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: USER.id, userName: USER.name }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || '실패');
+    const id = openInfo && window._lastRestaurantId;
+    await loadRestaurants();
+    if (id) reopenById(id);
+  } catch (e) { btn.disabled = false; alert('실패: ' + e.message); }
+}
+
+async function leaveMeetup(meetupId, btn) {
+  if (!USER.id) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/meetups/${meetupId}/leave`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: USER.id }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || '실패');
+    const id = window._lastRestaurantId;
+    await loadRestaurants();
+    if (id) reopenById(id);
+  } catch (e) { btn.disabled = false; alert('실패: ' + e.message); }
 }
 
 // 식당 전체 리뷰 보기

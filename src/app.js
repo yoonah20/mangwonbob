@@ -9,7 +9,9 @@ const db = require('./db/queries');
 const { pool } = db;
 const commands = require('./handlers/commands');
 const modals = require('./handlers/modals');
+const meetups = require('./handlers/meetups');
 const reviewSvc = require('./services/review');
+const blocks = require('./utils/blocks');
 
 // JSON 바디 파싱 (지도 뷰 API용)
 const expressJson = express.json();
@@ -66,6 +68,98 @@ expressApp.get('/debug/map-key', (_req, res) => {
   const key = process.env.KAKAO_JS_API_KEY || '';
   res.json({ key_set: !!key, key_preview: key ? key.slice(0, 6) + '…' : '(없음)' });
 });
+
+// 활성 점심 모집 목록 (지도 InfoWindow용)
+expressApp.get('/api/meetups', async (_req, res) => {
+  try {
+    const list = await db.listActiveMeetupsByRestaurant();
+    res.json(list);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 점심 모집 생성 (지도에서)
+expressApp.post('/api/meetups', expressJson, async (req, res) => {
+  try {
+    const { restaurantId, userId, userName, meetAt, note, channelId } = req.body;
+    if (!restaurantId || !userId || !meetAt) return res.status(400).json({ error: 'missing params' });
+    if (new Date(meetAt) <= new Date()) return res.status(400).json({ error: '미래 시간으로만 모집 가능' });
+
+    const meetup = await db.createMeetup({
+      restaurantId, organizerId: userId, organizerName: userName, meetAt, note,
+      channelId: channelId || process.env.MEETUP_CHANNEL_ID || null,
+    });
+    // 주최자 자동 참여
+    await db.joinMeetup(meetup.id, userId, userName);
+
+    // Slack 채널 공지
+    if (meetup.channel_id) {
+      try {
+        const restaurant = await db.getRestaurantById(restaurantId);
+        const participants = await db.listMeetupParticipants(meetup.id);
+        const result = await app.client.chat.postMessage({
+          channel: meetup.channel_id,
+          text: `🍽️ ${restaurant.name} 점심 모집`,
+          blocks: blocks.meetupAnnounceBlocks({ meetup, restaurant, participants }),
+        });
+        if (result.ts) await db.setMeetupMessageTs(meetup.id, result.ts);
+      } catch (e) {
+        console.error('점심 모집 슬랙 공지 실패:', e.message);
+      }
+    }
+    res.json(meetup);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 참여 / 나가기 / 마감 (지도에서)
+expressApp.post('/api/meetups/:id/join', expressJson, async (req, res) => {
+  try {
+    const { userId, userName } = req.body;
+    if (!userId) return res.status(400).json({ error: 'missing userId' });
+    await db.joinMeetup(parseInt(req.params.id, 10), userId, userName);
+    await refreshMeetupAnnounce(parseInt(req.params.id, 10));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+expressApp.post('/api/meetups/:id/leave', expressJson, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'missing userId' });
+    await db.leaveMeetup(parseInt(req.params.id, 10), userId);
+    await refreshMeetupAnnounce(parseInt(req.params.id, 10));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+expressApp.post('/api/meetups/:id/close', expressJson, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { userId } = req.body;
+    const meetup = await db.getMeetup(id);
+    if (!meetup) return res.status(404).json({ error: 'not found' });
+    if (meetup.organizer_id !== userId) return res.status(403).json({ error: '주최자만 마감 가능' });
+    await db.closeMeetup(id);
+    await refreshMeetupAnnounce(id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+async function refreshMeetupAnnounce(meetupId) {
+  try {
+    const meetup = await db.getMeetup(meetupId);
+    if (!meetup || !meetup.channel_id || !meetup.message_ts) return;
+    const restaurant = await db.getRestaurantById(meetup.restaurant_id);
+    const participants = await db.listMeetupParticipants(meetupId);
+    await app.client.chat.update({
+      channel: meetup.channel_id,
+      ts: meetup.message_ts,
+      text: `🍽️ ${restaurant.name} 점심 모집`,
+      blocks: blocks.meetupAnnounceBlocks({ meetup, restaurant, participants }),
+    });
+  } catch (e) {
+    console.error('모집 메시지 갱신 실패:', e.message);
+  }
+}
 
 // 식당 1곳의 리뷰 전체
 expressApp.get('/api/reviews/:id', async (req, res) => {
@@ -144,6 +238,7 @@ expressApp.post('/api/hide', expressJson, async (req, res) => {
 // 핸들러 등록
 commands.register(app);
 modals.register(app);
+meetups.register(app);
 
 // 전역 에러 처리
 app.error(async (err) => {
