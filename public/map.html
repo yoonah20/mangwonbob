@@ -376,6 +376,12 @@ if (typeof kakao === 'undefined') {
       fillColor: '#10b981', fillOpacity: 0.05,
     }).setMap(map);
 
+    // 지도 빈 곳 클릭 시 InfoWindow 닫기
+    kakao.maps.event.addListener(map, 'click', () => {
+      if (openInfo) { openInfo.close(); openInfo = null; }
+      document.querySelectorAll('#list .item.active').forEach(el => el.classList.remove('active'));
+    });
+
     await loadRestaurants();
     document.getElementById('search').addEventListener('input', renderAll);
   });
