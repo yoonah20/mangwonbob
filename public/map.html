@@ -50,18 +50,27 @@
   <div id="map"></div>
 </div>
 
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_JS_KEY__&autoload=false"></script>
+<script>
+function showError(msg) {
+  document.getElementById('list').innerHTML =
+    `<div class="empty" style="color:#dc2626;text-align:left;font-size:13px;line-height:1.6">
+      <strong>❌ 지도 로드 실패</strong><br><br>${msg}
+    </div>`;
+  document.getElementById('stat').textContent = '';
+}
+</script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_JS_KEY__&autoload=false"
+        onerror="showError('카카오 SDK 로드 실패. KAKAO_JS_API_KEY 환경변수와 카카오 앱의 웹 도메인 등록을 확인하세요.')"></script>
 <script>
 const OFFICE = { y: 37.5548733, x: 126.9094692 };
 let map, markers = [], infos = [], restaurants = [];
 
-// SDK 로드 실패 감지
-window.onerror = (msg, src) => {
-  document.getElementById('list').innerHTML =
-    `<div class="empty" style="color:red">❌ 지도 로드 실패<br>${msg}<br><br>카카오 앱 JavaScript 키와 도메인 등록을 확인하세요.</div>`;
-};
-
-kakao.maps.load(async () => {
+if (typeof kakao === 'undefined') {
+  showError('카카오 SDK가 차단됐거나 키가 잘못됐습니다.<br>' +
+    '• KAKAO_JS_API_KEY가 <strong>JavaScript 키</strong>인지 확인 (REST API 키 아님)<br>' +
+    '• 카카오 디벨로퍼스 → 플랫폼 → Web에 도메인이 정확히 등록됐는지 확인');
+} else {
+  kakao.maps.load(async () => {
   map = new kakao.maps.Map(document.getElementById('map'), {
     center: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
     level: 4,
@@ -87,7 +96,8 @@ kakao.maps.load(async () => {
   restaurants = await res.json();
   renderAll();
   document.getElementById('search').addEventListener('input', renderAll);
-});
+  });
+}
 
 function renderAll() {
   const q = (document.getElementById('search').value || '').toLowerCase();
