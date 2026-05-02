@@ -54,8 +54,8 @@ function register(app) {
     }
   });
 
-  // 카테고리 선택 → 추천 결과로 같은 메시지 업데이트
-  app.action('pick_category', async ({ ack, body, action, respond }) => {
+  // 카테고리 선택 → 추천 결과로 같은 메시지 업데이트 (action_id: pick_category:한식 등)
+  app.action(/^pick_category:/, async ({ ack, body, action, respond }) => {
     await ack();
     try {
       const category = action.value;

@@ -12,7 +12,7 @@ function catBtn(text, value) {
   return {
     type: 'button',
     text: { type: 'plain_text', text, emoji: true },
-    action_id: 'pick_category',
+    action_id: `pick_category:${value}`,
     value,
   };
 }
@@ -103,7 +103,7 @@ function pickedBlocks({ category, recommendations, mapUrl }) {
       type: 'actions',
       elements: [
         { type: 'button', text: { type: 'plain_text', text: '🔄 다른 추천' },
-          action_id: 'pick_category', value: category },
+          action_id: `pick_category:${category}`, value: category },
         { type: 'button', text: { type: 'plain_text', text: '⬅️ 다시 고르기' },
           action_id: 'back_to_home' },
         ...(mapUrl ? [{ type: 'button', text: { type: 'plain_text', text: '🗺️ 지도' },
