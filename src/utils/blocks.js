@@ -170,73 +170,7 @@ function visitConfirmBlocks(restaurant, { isFirstDiscoverer, userVisitCount, isR
   ];
 }
 
-// /밥 탐험 — 개인 현황
-function explorationBlocks(userId, exp, badges) {
-  const ratio = exp.totalRestaurants ? exp.discoveredCount / exp.totalRestaurants : 0;
-  const firstNames = exp.firstDiscoveries.slice(0, 5).map(r => r.name).join(', ') || '아직 없음';
-  const regularNames = exp.regulars.slice(0, 5)
-    .map(r => `${r.name} ${r.visit_count}회`).join(', ') || '아직 없음';
-
-  const lines = [
-    `🗺️ *${mention(userId)}의 탐험 기록*`,
-    '━━━━━━━━━━━━━━━━━━━',
-    `발견한 식당   *${exp.discoveredCount} / ${exp.totalRestaurants}곳*   ${progressBar(ratio)} ${Math.round(ratio * 100)}%`,
-    `🏴 첫 발견      *${exp.firstCount}곳* (${firstNames})`,
-    `👑 단골 (3회+)  *${exp.regulars.length}곳* (${regularNames})`,
-    `🥈 팀 내 순위   *${exp.rank}위 / ${exp.totalUsers}명*`,
-  ];
-  if (badges && badges.length) {
-    lines.push('');
-    lines.push('🏆 *획득 뱃지*');
-    badges.forEach(b => lines.push(`${b.emoji} *${b.label}* — _${b.sub}_`));
-  }
-  lines.push('━━━━━━━━━━━━━━━━━━━');
-
-  return [
-    { type: 'section', text: { type: 'mrkdwn', text: lines.join('\n') } },
-    footer(),
-  ];
-}
-
-// /밥 지도 — 팀 전체 현황
-function teamMapBlocks(team, mapUrl) {
-  const ratio = team.total ? team.discovered / team.total : 0;
-  const lines = [
-    '🗺️ *몬스테라하우스 탐험 지도*',
-    '━━━━━━━━━━━━━━━━━━━',
-    `발견 완료   *${team.discovered} / ${team.total}곳*   ${progressBar(ratio)} ${Math.round(ratio * 100)}%`,
-    `미발견      *${team.total - team.discovered}곳*`,
-    '',
-  ];
-  if (team.explorerKing) {
-    lines.push(`🥾 *탐험왕* — ${mention(team.explorerKing.slack_user_id)} (${team.explorerKing.discovered_count}곳 발견)`);
-  }
-  if (team.firstKing) {
-    lines.push(`🏴 *첫발견왕* — ${mention(team.firstKing.slack_user_id)} (${team.firstKing.first_count}곳 첫 발견)`);
-  }
-  if (team.regularKing) {
-    lines.push(`👑 *단골왕* — ${mention(team.regularKing.slack_user_id)} (${team.regularKing.restaurant_name} ${team.regularKing.visit_count}회)`);
-  }
-  lines.push('━━━━━━━━━━━━━━━━━━━');
-
-  const result = [
-    { type: 'section', text: { type: 'mrkdwn', text: lines.join('\n') } },
-  ];
-  if (mapUrl) {
-    result.push({
-      type: 'actions',
-      elements: [{
-        type: 'button',
-        text: { type: 'plain_text', text: '🗺️ 지도에서 보기' },
-        url: mapUrl,
-        action_id: 'open_map_view',
-        style: 'primary',
-      }],
-    });
-  }
-  result.push(footer());
-  return result;
-}
+// 점심 모집 + 탐험/지도 슬랙 메시지는 지도 페이지로 통합 — 별도 빌더 제거
 
 // 점심 모집 Slack 메시지
 function meetupAnnounceBlocks({ meetup, restaurant, participants }) {
@@ -361,8 +295,6 @@ module.exports = {
   homeBlocks,
   firstDiscoveryBlocks,
   visitConfirmBlocks,
-  explorationBlocks,
-  teamMapBlocks,
   reviewModal,
   meetupAnnounceBlocks,
   footer,
