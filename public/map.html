@@ -35,6 +35,11 @@
     cursor: pointer; white-space: nowrap; transition: all 0.15s;
   }
   #presets button.active { background: #10b981; color: #fff; border-color: #10b981; }
+  .cat-label {
+    margin-top: 12px; padding-top: 10px;
+    border-top: 1px solid #e5e5e5;
+    font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px;
+  }
   #cats {
     display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;
   }
@@ -227,10 +232,9 @@
         <button data-preset="rating">⭐ 평점</button>
         <button data-preset="my">👑 내 단골</button>
         <button data-preset="favorite">⭐ 즐겨찾기</button>
-        <button data-preset="myreviews">📝 내 리뷰</button>
         <button data-preset="unvisited">🌫️ 미탐험</button>
-        <button data-preset="hidden">⛔ 퇴출됨</button>
       </div>
+      <div class="cat-label">음식 카테고리</div>
       <div id="cats"></div>
     </header>
     <div id="section-label" hidden></div>
