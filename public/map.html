@@ -6,18 +6,20 @@
 <title>🍚 망원밥 — 탐험 지도</title>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, 'Apple SD Gothic Neo', 'Pretendard', sans-serif; }
-  #app { display: flex; height: 100vh; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font-family: -apple-system, 'Apple SD Gothic Neo', 'Pretendard', sans-serif; }
+  #app { display: flex; height: 100vh; height: 100dvh; }
   #sidebar {
     width: 320px; min-width: 320px; background: #fafaf7; border-right: 1px solid #e5e5e5;
     display: flex; flex-direction: column;
   }
-  #sidebar header { padding: 16px; border-bottom: 1px solid #e5e5e5; }
+  #sidebar header { padding: 16px; border-bottom: 1px solid #e5e5e5; position: relative; }
   #sidebar header h1 { margin: 0; font-size: 18px; }
   #sidebar header .stat { font-size: 13px; color: #666; margin-top: 4px; }
   #sidebar header .who { font-size: 12px; color: #10b981; margin-top: 4px; font-weight: 600; }
+  #sidebar .toggle { display: none; }
   #search { width: 100%; padding: 8px 10px; margin-top: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
-  #list { flex: 1; overflow-y: auto; }
+  #list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .item {
     padding: 12px 16px; border-bottom: 1px solid #eee; cursor: pointer;
     transition: background 0.15s;
@@ -94,6 +96,45 @@
     border-radius: 6px; cursor: pointer; font-size: 13px;
   }
   .modal button.primary { background: #10b981; color: #fff; border-color: #10b981; }
+
+  /* ─── 모바일 (≤768px) ─── */
+  @media (max-width: 768px) {
+    #app { flex-direction: column; }
+    #map { flex: 1; min-height: 0; order: 1; }
+    #sidebar {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      width: 100%; min-width: 0;
+      max-height: 75vh; max-height: 75dvh;
+      border-right: none;
+      border-radius: 16px 16px 0 0;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
+      transform: translateY(calc(100% - 110px));
+      transition: transform 0.28s ease-out;
+      z-index: 100;
+    }
+    #sidebar.expanded { transform: translateY(0); }
+    #sidebar header { padding: 14px 16px 10px; cursor: pointer; user-select: none; }
+    #sidebar header::before {
+      content: ''; display: block; width: 36px; height: 4px;
+      background: #d1d5db; border-radius: 2px;
+      margin: -4px auto 8px;
+    }
+    #sidebar header h1 { font-size: 16px; }
+    #search { font-size: 16px; /* iOS 자동 확대 방지 */ }
+    #list { padding-bottom: 16px; }
+    .item { padding: 14px 16px; }
+
+    .iw { min-width: 0; max-width: 240px; padding: 10px; }
+    .iw .actions button, .iw .actions a.btn { padding: 8px 10px; font-size: 13px; }
+
+    .modal-bg { align-items: flex-end; }
+    .modal {
+      width: 100%; max-width: 100%;
+      border-radius: 16px 16px 0 0;
+      padding: 20px 16px 24px;
+    }
+    .modal .stars { font-size: 32px; }
+  }
 </style>
 </head>
 <body>
@@ -192,7 +233,8 @@ if (typeof kakao === 'undefined') {
 }
 
 async function loadRestaurants() {
-  const res = await fetch('/api/restaurants');
+  const url = USER.id ? `/api/restaurants?user=${encodeURIComponent(USER.id)}` : '/api/restaurants';
+  const res = await fetch(url);
   restaurants = await res.json();
   renderAll();
 }
@@ -298,13 +340,23 @@ function buildInfoContent(r) {
       ${nearby.map(n => `<a class="nearby-item" onclick="selectById(${n.id})">${esc(n.name)}</a>`).join('')}
     </div>` : '';
 
+  // 리뷰 버튼 — 본인이 체크인한 식당만 활성화
+  let reviewBtn = '';
+  if (canAct) {
+    if (r.visited_by_me) {
+      reviewBtn = `<button onclick="openReview(${r.id}, '${esc(r.name).replace(/'/g, "\\'")}')">리뷰 ✍️</button>`;
+    } else {
+      reviewBtn = `<button disabled title="먼저 체크인부터!" style="opacity:0.4;cursor:not-allowed">리뷰 (체크인 필요)</button>`;
+    }
+  }
+
   return `<div class="iw">
     <div class="title">${categoryEmoji(r.category)} ${esc(r.name)}${badges}</div>
     <div class="meta">${esc(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
     <div class="meta">${ratingLine}</div>
     <div class="actions">
       ${canAct ? `<button class="primary" onclick="visit(${r.id}, this)">${visitLabel}</button>` : ''}
-      ${canAct ? `<button onclick="openReview(${r.id}, '${esc(r.name).replace(/'/g, "\\'")}')">리뷰 ✍️</button>` : ''}
+      ${reviewBtn}
       <a class="btn" href="${r.kakao_url}" target="_blank">카카오맵 →</a>
       ${canAct ? `<button class="danger" onclick="hideRestaurant(${r.id}, this)">숨김</button>` : ''}
     </div>
@@ -396,6 +448,18 @@ function setStars(v) {
 
 document.querySelectorAll('#stars span').forEach(s => {
   s.addEventListener('click', () => setStars(parseInt(s.dataset.v, 10)));
+});
+
+// 모바일 — 사이드바 헤더 탭하면 펼침/접힘 토글
+document.querySelector('#sidebar header').addEventListener('click', (e) => {
+  // 검색창 클릭은 제외
+  if (e.target.tagName === 'INPUT') return;
+  document.getElementById('sidebar').classList.toggle('expanded');
+});
+
+// 검색창에 입력하면 자동으로 펼침
+document.getElementById('search').addEventListener('focus', () => {
+  document.getElementById('sidebar').classList.add('expanded');
 });
 
 async function submitReview() {

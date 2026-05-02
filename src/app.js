@@ -67,10 +67,11 @@ expressApp.get('/debug/map-key', (_req, res) => {
   res.json({ key_set: !!key, key_preview: key ? key.slice(0, 6) + '…' : '(없음)' });
 });
 
-// 지도 뷰 데이터 API
-expressApp.get('/api/restaurants', async (_req, res) => {
+// 지도 뷰 데이터 API (user 쿼리로 본인 방문 여부 표시)
+expressApp.get('/api/restaurants', async (req, res) => {
   try {
-    const list = await db.listAllRestaurantsWithStatus();
+    const userId = req.query.user || null;
+    const list = await db.listAllRestaurantsWithStatus(userId);
     res.json(list);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -89,11 +90,13 @@ expressApp.post('/api/visit', expressJson, async (req, res) => {
   }
 });
 
-// 지도에서 리뷰 작성
+// 지도에서 리뷰 작성 — 체크인한 식당만 가능
 expressApp.post('/api/review', expressJson, async (req, res) => {
   try {
     const { restaurantId, userId, userName, rating, comment, tags } = req.body;
     if (!restaurantId || !userId || !rating) return res.status(400).json({ error: 'missing params' });
+    const visited = await db.userHasVisited(restaurantId, userId);
+    if (!visited) return res.status(403).json({ error: '먼저 체크인해야 리뷰를 쓸 수 있어요' });
     const review = await reviewSvc.recordReview({
       restaurantId, userId, userName: userName || userId,
       rating: parseInt(rating, 10), comment, tags: tags || [],

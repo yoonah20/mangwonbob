@@ -147,6 +147,14 @@ async function addVisit(restaurantId, userId, userName) {
   return { visit: rows[0], isFirstDiscoverer: isFirst };
 }
 
+async function userHasVisited(restaurantId, userId) {
+  const { rows } = await q(
+    `SELECT 1 FROM visits WHERE restaurant_id = $1 AND slack_user_id = $2 LIMIT 1`,
+    [restaurantId, userId]
+  );
+  return rows.length > 0;
+}
+
 async function countUserVisits(restaurantId, userId) {
   const { rows } = await q(
     `SELECT COUNT(*)::int AS c FROM visits WHERE restaurant_id = $1 AND slack_user_id = $2`,
@@ -266,16 +274,19 @@ async function getRegularKing(limit = 5) {
 }
 
 // 모든 식당 + 상태 (지도 뷰용)
-async function listAllRestaurantsWithStatus() {
-  const { rows } = await q(
-    `SELECT r.*,
+async function listAllRestaurantsWithStatus(userId = null) {
+  const meCol = userId
+    ? `, EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id AND v.slack_user_id = $1) AS visited_by_me`
+    : `, FALSE AS visited_by_me`;
+  const sql = `SELECT r.*,
        EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id) AS discovered,
        (SELECT ROUND(AVG(rating)::numeric, 1) FROM reviews WHERE restaurant_id = r.id) AS avg_rating,
        (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id)::int AS visit_count
+       ${meCol}
      FROM restaurants r
      WHERE COALESCE(r.hidden, FALSE) = FALSE
-     ORDER BY r.distance_from_office ASC`
-  );
+     ORDER BY r.distance_from_office ASC`;
+  const { rows } = userId ? await q(sql, [userId]) : await q(sql);
   return rows;
 }
 
@@ -298,6 +309,7 @@ module.exports = {
   listAllRestaurantsWithStatus,
   hideRestaurant,
   addVisit,
+  userHasVisited,
   countUserVisits,
   addReview,
   getLatestReview,
