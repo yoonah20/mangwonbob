@@ -79,14 +79,17 @@
   .empty { padding: 30px; text-align: center; color: #999; }
 
   /* InfoWindow 안의 액션 버튼 */
-  .iw { padding: 12px; font-size: 13px; min-width: 220px; line-height: 1.5; }
-  .iw .title { font-weight: 600; font-size: 14px; }
+  .iw { padding: 12px; font-size: 13px; min-width: 220px; max-width: 300px; line-height: 1.5; word-break: keep-all; }
+  .iw .title { font-weight: 600; font-size: 14px; line-height: 1.35; }
   .iw .meta { color: #666; font-size: 12px; }
   .iw .badge { display: inline-block; padding: 1px 6px; margin-left: 4px; border-radius: 4px;
     font-size: 10px; font-weight: 600; vertical-align: middle; }
   .iw .badge.hot { background: #fee2e2; color: #dc2626; }
   .iw .badge.star { background: #fef3c7; color: #d97706; }
-  .iw .actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .iw .actions { margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .iw .actions button, .iw .actions a.btn {
+    padding: 4px 8px; font-size: 11px;
+  }
   .iw .review-quote {
     margin-top: 8px; padding: 8px 10px; background: #fffaf0;
     border-left: 3px solid #f59e0b; border-radius: 4px;

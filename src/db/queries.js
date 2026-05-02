@@ -418,6 +418,9 @@ async function listAllRestaurantsWithStatus(userId = null) {
        (SELECT json_build_object('rating', rating, 'comment', comment, 'tags', tags, 'created_at', created_at)
         FROM reviews WHERE restaurant_id = r.id AND slack_user_id = $1 LIMIT 1) AS my_review`
     : `, FALSE AS visited_by_me, 0 AS my_visit_count, FALSE AS is_favorite, NULL AS my_review`;
+  const sampleReviewWhere = userId
+    ? `AND comment IS NOT NULL AND comment != '' AND slack_user_id != $1`
+    : `AND comment IS NOT NULL AND comment != ''`;
   const sql = `SELECT r.*,
        EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id) AS discovered,
        (SELECT ROUND(AVG(rating)::numeric, 1) FROM reviews WHERE restaurant_id = r.id) AS avg_rating,
@@ -426,7 +429,7 @@ async function listAllRestaurantsWithStatus(userId = null) {
        (SELECT json_build_object('rating', rating, 'comment', comment, 'tags', tags,
          'user_name', slack_user_name)
         FROM reviews
-        WHERE restaurant_id = r.id AND comment IS NOT NULL AND comment != ''
+        WHERE restaurant_id = r.id ${sampleReviewWhere}
         ORDER BY RANDOM() LIMIT 1) AS sample_review
        ${meCols}
      FROM restaurants r
