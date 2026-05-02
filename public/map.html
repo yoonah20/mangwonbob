@@ -15,6 +15,7 @@
   #sidebar header { padding: 16px; border-bottom: 1px solid #e5e5e5; }
   #sidebar header h1 { margin: 0; font-size: 18px; }
   #sidebar header .stat { font-size: 13px; color: #666; margin-top: 4px; }
+  #sidebar header .who { font-size: 12px; color: #10b981; margin-top: 4px; font-weight: 600; }
   #search { width: 100%; padding: 8px 10px; margin-top: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
   #list { flex: 1; overflow-y: auto; }
   .item {
@@ -34,6 +35,53 @@
     background: #fff; text-align: center;
   }
   .empty { padding: 30px; text-align: center; color: #999; }
+
+  /* InfoWindow 안의 액션 버튼 */
+  .iw { padding: 12px; font-size: 13px; min-width: 200px; line-height: 1.5; }
+  .iw .title { font-weight: 600; font-size: 14px; }
+  .iw .meta { color: #666; font-size: 12px; }
+  .iw .actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .iw button, .iw a.btn {
+    padding: 5px 9px; font-size: 12px; border: 1px solid #ddd;
+    background: #fff; border-radius: 4px; cursor: pointer; text-decoration: none; color: #333;
+  }
+  .iw button.primary { background: #10b981; color: #fff; border-color: #10b981; }
+  .iw button.danger { background: #fff; color: #dc2626; border-color: #fecaca; }
+  .iw button:hover { opacity: 0.85; }
+  .iw .toast { margin-top: 6px; font-size: 12px; color: #10b981; }
+
+  /* 리뷰 모달 */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000;
+    display: none; align-items: center; justify-content: center;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: #fff; padding: 24px; border-radius: 12px;
+    width: 90%; max-width: 400px;
+  }
+  .modal h2 { margin: 0 0 12px; font-size: 18px; }
+  .modal label { display: block; font-size: 13px; margin-top: 12px; color: #555; }
+  .modal .stars { font-size: 28px; cursor: pointer; user-select: none; }
+  .modal .stars span { opacity: 0.3; transition: opacity 0.1s; }
+  .modal .stars span.on { opacity: 1; }
+  .modal textarea {
+    width: 100%; min-height: 70px; padding: 8px; margin-top: 6px;
+    border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 13px;
+  }
+  .modal .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .modal .tags label {
+    margin-top: 0; padding: 4px 10px; border: 1px solid #ddd; border-radius: 999px;
+    cursor: pointer; font-size: 12px; user-select: none;
+  }
+  .modal .tags input { display: none; }
+  .modal .tags input:checked + span { color: #10b981; font-weight: 600; }
+  .modal .actions { margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end; }
+  .modal button {
+    padding: 8px 14px; border: 1px solid #ddd; background: #fff;
+    border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  .modal button.primary { background: #10b981; color: #fff; border-color: #10b981; }
 </style>
 </head>
 <body>
@@ -42,12 +90,39 @@
     <header>
       <h1>🍚 망원밥 탐험 지도</h1>
       <div class="stat" id="stat">불러오는 중…</div>
+      <div class="who" id="who"></div>
       <input id="search" type="text" placeholder="🔍 식당 / 카테고리 검색">
     </header>
     <div id="list"><div class="empty">로딩 중…</div></div>
     <footer>🌿 by 몬스테라하우스</footer>
   </aside>
   <div id="map"></div>
+</div>
+
+<!-- 리뷰 작성 모달 -->
+<div class="modal-bg" id="reviewModal">
+  <div class="modal">
+    <h2 id="reviewTitle">리뷰 작성</h2>
+    <label>별점</label>
+    <div class="stars" id="stars">
+      <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span>
+      <span data-v="4">★</span><span data-v="5">★</span>
+    </div>
+    <label>한 줄 코멘트 (선택)</label>
+    <textarea id="reviewComment" placeholder="국물이 진해요, 점심 특선 추천 등"></textarea>
+    <label>태그 (선택)</label>
+    <div class="tags" id="reviewTags">
+      <label><input type="checkbox" value="#혼밥"><span>#혼밥</span></label>
+      <label><input type="checkbox" value="#단체"><span>#단체</span></label>
+      <label><input type="checkbox" value="#웨이팅"><span>#웨이팅</span></label>
+      <label><input type="checkbox" value="#가성비"><span>#가성비</span></label>
+      <label><input type="checkbox" value="#빠름"><span>#빠름</span></label>
+    </div>
+    <div class="actions">
+      <button onclick="closeReview()">취소</button>
+      <button class="primary" onclick="submitReview()">제출</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -60,43 +135,54 @@ function showError(msg) {
 }
 </script>
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_JS_KEY__&autoload=false"
-        onerror="showError('카카오 SDK 로드 실패. KAKAO_JS_API_KEY 환경변수와 카카오 앱의 웹 도메인 등록을 확인하세요.')"></script>
+        onerror="showError('카카오 SDK 로드 실패. KAKAO_JS_API_KEY 환경변수와 카카오 앱 도메인 등록 확인.')"></script>
 <script>
 const OFFICE = { y: 37.5548733, x: 126.9094692 };
-let map, markers = [], infos = [], restaurants = [];
+const params = new URLSearchParams(location.search);
+const USER = { id: params.get('user') || '', name: params.get('name') || '' };
+let map, markers = [], infos = [], restaurants = [], openInfo = null;
+let reviewTarget = null, reviewRating = 0;
+
+if (USER.id) {
+  document.getElementById('who').textContent = `🥾 ${USER.name || USER.id} 으로 체크인`;
+} else {
+  document.getElementById('who').textContent = '⚠️ 슬랙 /밥 지도 로 열어야 체크인 가능';
+}
 
 if (typeof kakao === 'undefined') {
   showError('카카오 SDK가 차단됐거나 키가 잘못됐습니다.<br>' +
-    '• KAKAO_JS_API_KEY가 <strong>JavaScript 키</strong>인지 확인 (REST API 키 아님)<br>' +
-    '• 카카오 디벨로퍼스 → 플랫폼 → Web에 도메인이 정확히 등록됐는지 확인');
+    '• KAKAO_JS_API_KEY가 <strong>JavaScript 키</strong>인지 확인<br>' +
+    '• 카카오 디벨로퍼스 → 플랫폼 → Web에 도메인 등록 확인');
 } else {
   kakao.maps.load(async () => {
-  map = new kakao.maps.Map(document.getElementById('map'), {
-    center: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
-    level: 4,
+    map = new kakao.maps.Map(document.getElementById('map'), {
+      center: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
+      level: 4,
+    });
+
+    new kakao.maps.Marker({
+      position: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
+      map,
+      image: makeMarker('#10b981', '🏢', 36),
+      title: '몬스테라하우스',
+    });
+
+    new kakao.maps.Circle({
+      center: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
+      radius: 500,
+      strokeWeight: 1, strokeColor: '#10b981', strokeOpacity: 0.4,
+      fillColor: '#10b981', fillOpacity: 0.05,
+    }).setMap(map);
+
+    await loadRestaurants();
+    document.getElementById('search').addEventListener('input', renderAll);
   });
+}
 
-  // 회사 마커
-  new kakao.maps.Marker({
-    position: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
-    map,
-    image: makeMarker('#10b981', '🏢', 36),
-    title: '몬스테라하우스',
-  });
-
-  // 500m 반경 표시
-  new kakao.maps.Circle({
-    center: new kakao.maps.LatLng(OFFICE.y, OFFICE.x),
-    radius: 500,
-    strokeWeight: 1, strokeColor: '#10b981', strokeOpacity: 0.4,
-    fillColor: '#10b981', fillOpacity: 0.05,
-  }).setMap(map);
-
+async function loadRestaurants() {
   const res = await fetch('/api/restaurants');
   restaurants = await res.json();
   renderAll();
-  document.getElementById('search').addEventListener('input', renderAll);
-  });
 }
 
 function renderAll() {
@@ -105,11 +191,9 @@ function renderAll() {
     !q || r.name.toLowerCase().includes(q) || (r.category || '').toLowerCase().includes(q)
   );
 
-  // 마커 정리
   markers.forEach(m => m.setMap(null));
   markers = []; infos = [];
 
-  // 마커 추가
   filtered.forEach((r, idx) => {
     const isDisc = r.discovered;
     const color = isDisc ? '#f59e0b' : '#cbd5e1';
@@ -119,26 +203,14 @@ function renderAll() {
       image: makeMarker(color, '', 22),
       title: r.name,
     });
-    const ratingLine = r.avg_rating
-      ? `⭐ ${r.avg_rating} · ${r.visit_count}회 방문`
-      : '🌫️ 아직 미탐험';
     const info = new kakao.maps.InfoWindow({
-      content: `<div style="padding:10px;font-size:13px;min-width:160px;line-height:1.5">
-        <div style="font-weight:600">${isDisc ? '✅' : '🌫️'} ${escapeHtml(r.name)}</div>
-        <div style="color:#666">${escapeHtml(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
-        <div style="color:#666;margin-top:4px">${ratingLine}</div>
-        <a href="${r.kakao_url}" target="_blank" style="color:#3b82f6;font-size:12px">카카오맵 →</a>
-      </div>`,
+      content: buildInfoContent(r),
+      removable: true,
     });
-    kakao.maps.event.addListener(marker, 'click', () => {
-      infos.forEach(i => i.close());
-      info.open(map, marker);
-      highlightItem(idx);
-    });
+    kakao.maps.event.addListener(marker, 'click', () => openMarker(idx));
     markers.push(marker); infos.push(info);
   });
 
-  // 리스트 렌더
   const list = document.getElementById('list');
   if (!filtered.length) {
     list.innerHTML = '<div class="empty">검색 결과 없음</div>';
@@ -149,8 +221,8 @@ function renderAll() {
         ? `<span class="status disc">✅ 탐험 완료${r.avg_rating ? ' · ⭐ ' + r.avg_rating : ''}</span>`
         : `<span class="status unk">🌫️ 미탐험</span>`;
       return `<div class="item" data-idx="${idx}">
-        <div class="name">${escapeHtml(r.name)}</div>
-        <div class="meta">${escapeHtml(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
+        <div class="name">${esc(r.name)}</div>
+        <div class="meta">${esc(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
         ${status}
       </div>`;
     }).join('');
@@ -159,26 +231,133 @@ function renderAll() {
         const idx = parseInt(el.dataset.idx, 10);
         const r = filtered[idx];
         map.panTo(new kakao.maps.LatLng(r.latitude, r.longitude));
-        infos.forEach(i => i.close());
-        infos[idx].open(map, markers[idx]);
-        highlightItem(idx);
+        openMarker(idx);
       });
     });
   }
 
-  // 통계
+  // 현재 필터 결과를 액션에서 참조하도록 보관
+  window._filtered = filtered;
+
   const total = restaurants.length;
   const disc = restaurants.filter(r => r.discovered).length;
   document.getElementById('stat').textContent =
     `🗺️ ${disc} / ${total}곳 탐험 완료` + (q ? ` (검색: ${filtered.length}개)` : '');
 }
 
-function highlightItem(idx) {
+function openMarker(idx) {
+  if (openInfo) openInfo.close();
+  infos[idx].open(map, markers[idx]);
+  openInfo = infos[idx];
   document.querySelectorAll('#list .item').forEach((el, i) => {
-    el.classList.toggle('active', i === idx);
+    el.classList.toggle('active', parseInt(el.dataset.idx, 10) === idx);
   });
   const target = document.querySelector(`#list .item[data-idx="${idx}"]`);
   if (target) target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function buildInfoContent(r) {
+  const isDisc = r.discovered;
+  const ratingLine = r.avg_rating
+    ? `⭐ ${r.avg_rating} · ${r.visit_count}회 방문`
+    : '🌫️ 아직 미탐험';
+  const canAct = !!USER.id;
+  const visitLabel = isDisc ? '또 갔어요 +1' : '나 가봤어! 🥾';
+  return `<div class="iw">
+    <div class="title">${isDisc ? '✅' : '🌫️'} ${esc(r.name)}</div>
+    <div class="meta">${esc(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
+    <div class="meta">${ratingLine}</div>
+    <div class="actions">
+      ${canAct ? `<button class="primary" onclick="visit(${r.id}, this)">${visitLabel}</button>` : ''}
+      ${canAct ? `<button onclick="openReview(${r.id}, '${esc(r.name).replace(/'/g, "\\'")}')">리뷰 ✍️</button>` : ''}
+      <a class="btn" href="${r.kakao_url}" target="_blank">카카오맵 →</a>
+      ${canAct ? `<button class="danger" onclick="hideRestaurant(${r.id}, this)">숨김</button>` : ''}
+    </div>
+    <div class="toast" id="toast-${r.id}"></div>
+  </div>`;
+}
+
+async function visit(restaurantId, btn) {
+  if (!USER.id) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/visit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ restaurantId, userId: USER.id, userName: USER.name }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const msgs = ['✅ 방문 기록!'];
+    if (data.isFirstDiscoverer) msgs.push('🏴 첫 발견자!');
+    if (data.isRegular) msgs.push(`👑 단골 (${data.userVisitCount}회)`);
+    document.getElementById('toast-' + restaurantId).textContent = msgs.join(' · ');
+    setTimeout(() => loadRestaurants(), 800);
+  } catch (e) {
+    btn.disabled = false;
+    alert('실패: ' + e.message);
+  }
+}
+
+async function hideRestaurant(restaurantId, btn) {
+  if (!confirm('이 식당을 목록에서 숨길까요?\n(배달 전문 등 갈 수 없는 곳)')) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/hide', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ restaurantId }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || 'failed');
+    if (openInfo) openInfo.close();
+    loadRestaurants();
+  } catch (e) {
+    btn.disabled = false;
+    alert('실패: ' + e.message);
+  }
+}
+
+function openReview(restaurantId, name) {
+  reviewTarget = restaurantId;
+  reviewRating = 0;
+  document.getElementById('reviewTitle').textContent = `${name} 리뷰`;
+  document.getElementById('reviewComment').value = '';
+  document.querySelectorAll('#reviewTags input').forEach(c => c.checked = false);
+  setStars(0);
+  document.getElementById('reviewModal').classList.add('show');
+}
+
+function closeReview() {
+  document.getElementById('reviewModal').classList.remove('show');
+}
+
+function setStars(v) {
+  reviewRating = v;
+  document.querySelectorAll('#stars span').forEach(s => {
+    s.classList.toggle('on', parseInt(s.dataset.v, 10) <= v);
+  });
+}
+
+document.querySelectorAll('#stars span').forEach(s => {
+  s.addEventListener('click', () => setStars(parseInt(s.dataset.v, 10)));
+});
+
+async function submitReview() {
+  if (!reviewRating) return alert('별점을 선택해주세요');
+  const comment = document.getElementById('reviewComment').value.trim();
+  const tags = Array.from(document.querySelectorAll('#reviewTags input:checked')).map(c => c.value);
+  try {
+    const res = await fetch('/api/review', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restaurantId: reviewTarget, userId: USER.id, userName: USER.name,
+        rating: reviewRating, comment, tags,
+      }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || 'failed');
+    closeReview();
+    loadRestaurants();
+  } catch (e) {
+    alert('실패: ' + e.message);
+  }
 }
 
 function makeMarker(color, emoji, size) {
@@ -200,7 +379,7 @@ function formatDist(m) {
   return `도보 ${Math.max(1, Math.round(m / 80))}분`;
 }
 
-function escapeHtml(s) {
+function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 </script>

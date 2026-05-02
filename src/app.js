@@ -9,6 +9,10 @@ const db = require('./db/queries');
 const { pool } = db;
 const commands = require('./handlers/commands');
 const modals = require('./handlers/modals');
+const reviewSvc = require('./services/review');
+
+// JSON 바디 파싱 (지도 뷰 API용)
+const expressJson = express.json();
 
 // 앱 시작 시 스키마 자동 적용 (IF NOT EXISTS라 멱등)
 async function initDb() {
@@ -68,6 +72,45 @@ expressApp.get('/api/restaurants', async (_req, res) => {
   try {
     const list = await db.listAllRestaurantsWithStatus();
     res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 지도에서 방문 체크인
+expressApp.post('/api/visit', expressJson, async (req, res) => {
+  try {
+    const { restaurantId, userId, userName } = req.body;
+    if (!restaurantId || !userId) return res.status(400).json({ error: 'missing params' });
+    const result = await reviewSvc.recordVisit(restaurantId, userId, userName || userId);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 지도에서 리뷰 작성
+expressApp.post('/api/review', expressJson, async (req, res) => {
+  try {
+    const { restaurantId, userId, userName, rating, comment, tags } = req.body;
+    if (!restaurantId || !userId || !rating) return res.status(400).json({ error: 'missing params' });
+    const review = await reviewSvc.recordReview({
+      restaurantId, userId, userName: userName || userId,
+      rating: parseInt(rating, 10), comment, tags: tags || [],
+    });
+    res.json(review);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 식당 숨김 (배달 전문점 등)
+expressApp.post('/api/hide', expressJson, async (req, res) => {
+  try {
+    const { restaurantId } = req.body;
+    if (!restaurantId) return res.status(400).json({ error: 'missing params' });
+    await db.hideRestaurant(restaurantId);
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

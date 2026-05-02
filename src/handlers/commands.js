@@ -40,7 +40,7 @@ function register(app) {
         case 'exploration':
           return respond(await renderExploration(command.user_id));
         case 'map':
-          return respond(await renderMap());
+          return respond(await renderMap(command.user_id, command.user_name));
         case 'visit':
           return handleVisit({ name: parsed.name, command, client, respond });
         case 'review':
@@ -139,11 +139,16 @@ async function renderExploration(userId) {
   };
 }
 
-async function renderMap() {
+async function renderMap(userId, userName) {
   const team = await rankingSvc.getTeamMap();
-  const mapUrl = process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL.replace(/\/$/, '')}/map` : null;
+  let mapUrl = null;
+  if (process.env.PUBLIC_URL) {
+    const base = process.env.PUBLIC_URL.replace(/\/$/, '');
+    const params = new URLSearchParams({ user: userId || '', name: userName || '' });
+    mapUrl = `${base}/map?${params.toString()}`;
+  }
   return {
-    response_type: 'in_channel',
+    response_type: 'ephemeral',
     text: '🗺️ 팀 탐험 지도',
     blocks: blocks.teamMapBlocks(team, mapUrl),
   };

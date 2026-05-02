@@ -14,8 +14,12 @@ CREATE TABLE IF NOT EXISTS restaurants (
   distance_from_office INTEGER,    -- 사무실로부터의 거리(미터)
   latitude DECIMAL(10, 7),
   longitude DECIMAL(10, 7),
+  hidden BOOLEAN DEFAULT FALSE,    -- 배달 전문점 등 갈 수 없는 곳 숨김
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- 기존 테이블에도 안전하게 추가
+ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_restaurants_category ON restaurants(category);
 CREATE INDEX IF NOT EXISTS idx_restaurants_distance ON restaurants(distance_from_office);

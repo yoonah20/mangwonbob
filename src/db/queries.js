@@ -78,7 +78,8 @@ async function getRestaurantStats(restaurantId) {
 // 방문된 적 있는 식당 목록 (DISCOVERED)
 async function listDiscoveredRestaurants(category = null, limit = 20) {
   const params = [];
-  let where = `WHERE EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id)`;
+  let where = `WHERE COALESCE(r.hidden, FALSE) = FALSE
+    AND EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id)`;
   if (category) {
     params.push(`%${category}%`);
     where += ` AND r.category ILIKE $${params.length}`;
@@ -95,7 +96,8 @@ async function listDiscoveredRestaurants(category = null, limit = 20) {
 // 미탐험 식당
 async function listUnknownRestaurants(category = null, limit = 5) {
   const params = [];
-  let where = `WHERE NOT EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id)`;
+  let where = `WHERE COALESCE(r.hidden, FALSE) = FALSE
+    AND NOT EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id)`;
   if (category) {
     params.push(`%${category}%`);
     where += ` AND r.category ILIKE $${params.length}`;
@@ -112,10 +114,10 @@ async function listUnknownRestaurants(category = null, limit = 5) {
 // 추천 식당 (탐험 + 미탐험 섞어서)
 async function listRecommendedRestaurants(category = null, limit = 3) {
   const params = [];
-  let where = '';
+  let where = `WHERE COALESCE(r.hidden, FALSE) = FALSE`;
   if (category) {
     params.push(`%${category}%`);
-    where = `WHERE r.category ILIKE $${params.length}`;
+    where += ` AND r.category ILIKE $${params.length}`;
   }
   params.push(limit);
   const { rows } = await q(
@@ -185,7 +187,7 @@ async function getUserStats(userId) {
     `SELECT
        (SELECT COUNT(DISTINCT restaurant_id) FROM visits WHERE slack_user_id = $1)::int AS discovered_count,
        (SELECT COUNT(*) FROM visits WHERE slack_user_id = $1 AND is_first_discoverer = TRUE)::int AS first_count,
-       (SELECT COUNT(*) FROM restaurants)::int AS total_restaurants`,
+       (SELECT COUNT(*) FROM restaurants WHERE COALESCE(hidden, FALSE) = FALSE)::int AS total_restaurants`,
     [userId]
   );
   return rows[0];
@@ -220,7 +222,7 @@ async function getUserRegulars(userId, minVisits = 3) {
 async function getTeamProgress() {
   const { rows } = await q(
     `SELECT
-       (SELECT COUNT(*) FROM restaurants)::int AS total,
+       (SELECT COUNT(*) FROM restaurants WHERE COALESCE(hidden, FALSE) = FALSE)::int AS total,
        (SELECT COUNT(DISTINCT restaurant_id) FROM visits)::int AS discovered`
   );
   return rows[0];
@@ -271,9 +273,15 @@ async function listAllRestaurantsWithStatus() {
        (SELECT ROUND(AVG(rating)::numeric, 1) FROM reviews WHERE restaurant_id = r.id) AS avg_rating,
        (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id)::int AS visit_count
      FROM restaurants r
+     WHERE COALESCE(r.hidden, FALSE) = FALSE
      ORDER BY r.distance_from_office ASC`
   );
   return rows;
+}
+
+// 식당 숨김 처리
+async function hideRestaurant(id) {
+  await q(`UPDATE restaurants SET hidden = TRUE WHERE id = $1`, [id]);
 }
 
 module.exports = {
@@ -288,6 +296,7 @@ module.exports = {
   listUnknownRestaurants,
   listRecommendedRestaurants,
   listAllRestaurantsWithStatus,
+  hideRestaurant,
   addVisit,
   countUserVisits,
   addReview,
