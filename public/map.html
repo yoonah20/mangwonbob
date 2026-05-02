@@ -643,7 +643,7 @@ function buildInfoContent(r) {
     ? `⭐ ${r.avg_rating} · ${r.visit_count}회 방문`
     : '🌫️ 아직 미탐험';
   const canAct = !!USER.id;
-  const visitLabel = isDisc ? '또 갔어요 +1' : '나 가봤어! 🥾';
+  const visitLabel = isDisc ? '🥾 +1' : '🥾 가봤어';
 
   // 인기/평점 뱃지
   const visits = r.visit_count || 0;
@@ -730,7 +730,7 @@ function buildInfoContent(r) {
 
   // 같이 가요 버튼
   const meetupBtn = canAct
-    ? `<button onclick="openMeetupModal(${r.id}, '${esc(r.name).replace(/'/g, "\\'")}')">🍽️ 같이 가요</button>`
+    ? `<button onclick="openMeetupModal(${r.id}, '${esc(r.name).replace(/'/g, "\\'")}')">🍽️ 같이 가</button>`
     : '';
 
   const hideTinyBtn = canAct
@@ -854,19 +854,26 @@ async function searchKakaoFood(q) {
       target.innerHTML = '<div class="empty" style="font-size:12px;color:#888;padding:20px 0;text-align:center">결과 없음 (반경 2km 내)</div>';
       return;
     }
-    const existing = new Set(restaurants.concat(hiddenRestaurants).map(r => String(r.kakao_place_id)));
+    const visibleSet = new Set(restaurants.map(r => String(r.kakao_place_id)));
+    const hiddenSet = new Set(hiddenRestaurants.map(r => String(r.kakao_place_id)));
     target.innerHTML = docs.map(d => {
-      const isExisting = existing.has(String(d.id));
+      const idStr = String(d.id);
       const docJson = JSON.stringify(d).replace(/"/g, '&quot;');
+      let action;
+      if (visibleSet.has(idStr)) {
+        action = '<span style="font-size:11px;color:#888">이미 있음</span>';
+      } else if (hiddenSet.has(idStr)) {
+        action = `<button class="primary" data-doc="${docJson}" onclick="addKakaoDoc(this)" style="background:#7c3aed;border-color:#7c3aed">🌟 부활</button>`;
+      } else {
+        action = `<button class="primary" data-doc="${docJson}" onclick="addKakaoDoc(this)">추가</button>`;
+      }
       return `<div class="add-item">
         <div class="info">
-          <div class="name">${esc(d.place_name)}</div>
+          <div class="name">${esc(d.place_name)}${hiddenSet.has(idStr) ? ' <span style="font-size:10px;color:#94a3b8">(퇴출됨)</span>' : ''}</div>
           <div class="meta">${esc(d.category_name || '')}</div>
           <div class="meta">${esc(d.address_name || '')} · ${d.distance ? Math.round(d.distance) + 'm' : ''}</div>
         </div>
-        ${isExisting
-          ? '<span style="font-size:11px;color:#888">이미 있음</span>'
-          : `<button class="primary" data-doc="${docJson}" onclick="addKakaoDoc(this)">추가</button>`}
+        ${action}
       </div>`;
     }).join('');
   } catch {
