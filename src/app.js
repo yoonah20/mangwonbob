@@ -11,6 +11,7 @@ const commands = require('./handlers/commands');
 const meetups = require('./handlers/meetups');
 const reviewSvc = require('./services/review');
 const badgesSvc = require('./services/badges');
+const kakaoSvc = require('./services/kakao');
 const blocks = require('./utils/blocks');
 
 // JSON 바디 파싱 (지도 뷰 API용)
@@ -263,6 +264,32 @@ expressApp.get('/api/hidden', async (_req, res) => {
   try {
     const list = await db.listHiddenRestaurants();
     res.json(list);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 카카오 키워드 검색 (수동 추가용)
+expressApp.get('/api/kakao/search', async (req, res) => {
+  try {
+    const q = req.query.q;
+    if (!q) return res.json([]);
+    const docs = await kakaoSvc.searchFoodByKeyword(q);
+    res.json(docs);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 식당 수동 추가 (Kakao 검색 결과를 그대로 받아 upsert)
+expressApp.post('/api/restaurants', expressJson, async (req, res) => {
+  try {
+    const doc = req.body;
+    if (!doc || !doc.id) return res.status(400).json({ error: 'invalid kakao document' });
+    const dist = kakaoSvc.haversine(
+      kakaoSvc.OFFICE.y, kakaoSvc.OFFICE.x,
+      parseFloat(doc.y), parseFloat(doc.x)
+    );
+    const restaurant = kakaoSvc.mapKakaoToRestaurant({ ...doc, _distFromOffice: Math.round(dist) });
+    const saved = await db.upsertRestaurant(restaurant);
+    if (saved.hidden) await db.unhideRestaurant(saved.id);  // 퇴출됐던 곳이면 복구
+    res.json(saved);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

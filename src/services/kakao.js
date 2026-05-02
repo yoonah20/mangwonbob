@@ -44,6 +44,17 @@ async function findLocationByKeyword(keyword) {
   };
 }
 
+// 키워드로 음식점 검색 (수동 추가용 — 회사 반경 2km 내, FD6 카테고리)
+async function searchFoodByKeyword(query, { radius = 2000, size = 10 } = {}) {
+  const { data } = await client.get('/search/keyword.json', {
+    params: {
+      query, x: OFFICE.x, y: OFFICE.y, radius, sort: 'distance', size,
+      category_group_code: CATEGORY_GROUP_CODE,
+    },
+  });
+  return data.documents || [];
+}
+
 // Haversine 공식 — 두 좌표 사이 거리(m)
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -130,6 +141,7 @@ module.exports = {
   OFFICE,
   searchByCategoryAt,
   findLocationByKeyword,
+  searchFoodByKeyword,
   collectAllRestaurants,
   collectAroundCenter,
   mapKakaoToRestaurant,

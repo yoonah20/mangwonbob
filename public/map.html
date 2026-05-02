@@ -224,7 +224,13 @@
 <div id="app">
   <aside id="sidebar">
     <header>
-      <h1>🍚 망원밥 탐험 지도</h1>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h1 style="margin:0">🍚 망원밥 탐험 지도</h1>
+        <button id="addBtn" onclick="openAddModal()" title="식당 추가"
+          style="padding:6px 10px;font-size:13px;background:#10b981;color:#fff;border:none;border-radius:6px;cursor:pointer;flex:0 0 auto">
+          ➕ 추가
+        </button>
+      </div>
       <div class="stat" id="stat">불러오는 중…</div>
       <div class="who" id="who"></div>
       <div id="badges"></div>
@@ -247,6 +253,28 @@
   </aside>
   <div id="map"></div>
 </div>
+
+<!-- 식당 수동 추가 모달 -->
+<div class="modal-bg" id="addModal">
+  <div class="modal" style="max-width:440px">
+    <h2>➕ 식당 추가</h2>
+    <input id="addSearch" type="text" placeholder="식당 이름으로 카카오에서 검색…"
+      style="width:100%;padding:10px;margin-top:8px;border:1px solid #ddd;border-radius:6px;font-size:14px">
+    <div id="addResults" style="margin-top:12px;max-height:340px;overflow-y:auto;-webkit-overflow-scrolling:touch"></div>
+    <div class="actions"><button onclick="closeAddModal()">닫기</button></div>
+  </div>
+</div>
+<style>
+  .add-item { display:flex; justify-content:space-between; align-items:center; gap:8px;
+    padding:10px 4px; border-bottom:1px solid #eee; }
+  .add-item:last-child { border-bottom:none; }
+  .add-item .info { flex:1; min-width:0; }
+  .add-item .info .name { font-weight:600; font-size:14px; }
+  .add-item .info .meta { font-size:11px; color:#666; margin-top:2px; }
+  .add-item button { flex:0 0 auto; padding:6px 12px; font-size:12px; border-radius:6px;
+    border:1px solid #10b981; background:#fff; color:#10b981; cursor:pointer; }
+  .add-item button.primary { background:#10b981; color:#fff; }
+</style>
 
 <!-- 점심 모집 생성 모달 -->
 <div class="modal-bg" id="meetupModal">
@@ -774,6 +802,80 @@ async function toggleFavorite(restaurantId, btn) {
     await loadRestaurants();
     if (id) reopenById(id);
   } catch (e) { btn.disabled = false; alert('실패: ' + e.message); }
+}
+
+// ───────── 식당 수동 추가 ─────────
+function openAddModal() {
+  document.getElementById('addSearch').value = '';
+  document.getElementById('addResults').innerHTML =
+    '<div class="empty" style="font-size:12px;color:#888;padding:20px 0;text-align:center">검색어를 입력하세요</div>';
+  document.getElementById('addModal').classList.add('show');
+  setTimeout(() => document.getElementById('addSearch').focus(), 100);
+}
+
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('show');
+}
+
+let _addSearchTimer;
+document.getElementById('addSearch').addEventListener('input', e => {
+  clearTimeout(_addSearchTimer);
+  const q = e.target.value.trim();
+  const target = document.getElementById('addResults');
+  if (q.length < 2) {
+    target.innerHTML = '<div class="empty" style="font-size:12px;color:#888;padding:20px 0;text-align:center">2글자 이상 입력</div>';
+    return;
+  }
+  _addSearchTimer = setTimeout(() => searchKakaoFood(q), 300);
+});
+
+async function searchKakaoFood(q) {
+  const target = document.getElementById('addResults');
+  target.innerHTML = '<div class="empty" style="font-size:12px;color:#888;padding:20px 0;text-align:center">검색 중…</div>';
+  try {
+    const res = await fetch('/api/kakao/search?q=' + encodeURIComponent(q));
+    const docs = await res.json();
+    if (!docs.length) {
+      target.innerHTML = '<div class="empty" style="font-size:12px;color:#888;padding:20px 0;text-align:center">결과 없음 (반경 2km 내)</div>';
+      return;
+    }
+    const existing = new Set(restaurants.concat(hiddenRestaurants).map(r => String(r.kakao_place_id)));
+    target.innerHTML = docs.map(d => {
+      const isExisting = existing.has(String(d.id));
+      const docJson = JSON.stringify(d).replace(/"/g, '&quot;');
+      return `<div class="add-item">
+        <div class="info">
+          <div class="name">${esc(d.place_name)}</div>
+          <div class="meta">${esc(d.category_name || '')}</div>
+          <div class="meta">${esc(d.address_name || '')} · ${d.distance ? Math.round(d.distance) + 'm' : ''}</div>
+        </div>
+        ${isExisting
+          ? '<span style="font-size:11px;color:#888">이미 있음</span>'
+          : `<button class="primary" data-doc="${docJson}" onclick="addKakaoDoc(this)">추가</button>`}
+      </div>`;
+    }).join('');
+  } catch {
+    target.innerHTML = '<div class="empty" style="color:#dc2626;padding:20px 0;text-align:center">검색 실패</div>';
+  }
+}
+
+async function addKakaoDoc(btn) {
+  const doc = JSON.parse(btn.dataset.doc.replace(/&quot;/g, '"'));
+  btn.disabled = true;
+  btn.textContent = '추가 중…';
+  try {
+    const res = await fetch('/api/restaurants', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(doc),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || '실패');
+    btn.textContent = '✓ 추가됨';
+    btn.style.background = '#10b981'; btn.style.color = '#fff';
+    await loadRestaurants();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '추가';
+    alert('실패: ' + e.message);
+  }
 }
 
 // ───────── 점심 모집 ─────────
