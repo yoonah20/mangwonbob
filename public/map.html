@@ -749,7 +749,6 @@ function buildInfoContent(r) {
       ${cancelBtn}
       ${reviewBtn}
       ${meetupBtn}
-      <a class="btn" href="${kakaoDirectionsUrl(r)}" target="_blank">🚶 길찾기</a>
     </div>
     <a class="kakao-link" href="${r.kakao_url}" target="_blank">📍 카카오맵에서 보기</a>
     <div class="toast" id="toast-${r.id}"></div>
@@ -1283,16 +1282,6 @@ function drawRoute(r) {
 
 function clearRoute() {
   if (routeLine) { routeLine.setMap(null); routeLine = null; }
-}
-
-// 카카오 외부 길찾기 URL (도보)
-function kakaoDirectionsUrl(r) {
-  const params = new URLSearchParams({
-    sName: '월드컵로13길 19-25', sX: OFFICE.x, sY: OFFICE.y,
-    eName: r.name, eX: r.longitude, eY: r.latitude,
-    target: 'walk',
-  });
-  return `https://map.kakao.com/?${params.toString()}`;
 }
 
 // Haversine (m)
