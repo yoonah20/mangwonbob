@@ -8,7 +8,6 @@ const express = require('express');
 const db = require('./db/queries');
 const { pool } = db;
 const commands = require('./handlers/commands');
-const modals = require('./handlers/modals');
 const meetups = require('./handlers/meetups');
 const reviewSvc = require('./services/review');
 const badgesSvc = require('./services/badges');
@@ -183,12 +182,25 @@ expressApp.get('/api/restaurants', async (req, res) => {
   }
 });
 
-// 지도에서 방문 체크인
+// 지도에서 방문 체크인 (+ 첫 발견자면 슬랙 채널에 자동 공지)
 expressApp.post('/api/visit', expressJson, async (req, res) => {
   try {
-    const { restaurantId, userId, userName } = req.body;
+    const { restaurantId, userId, userName, channelId } = req.body;
     if (!restaurantId || !userId) return res.status(400).json({ error: 'missing params' });
     const result = await reviewSvc.recordVisit(restaurantId, userId, userName || userId);
+
+    if (result.isFirstDiscoverer && channelId) {
+      try {
+        const restaurant = await db.getRestaurantById(restaurantId);
+        await app.client.chat.postMessage({
+          channel: channelId,
+          text: `🎉 ${restaurant.name} 첫 발견!`,
+          blocks: blocks.firstDiscoveryBlocks(restaurant, userId),
+        });
+      } catch (e) {
+        console.error('첫 발견 공지 실패:', e.message);
+      }
+    }
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -276,7 +288,6 @@ expressApp.post('/api/favorite', expressJson, async (req, res) => {
 
 // 핸들러 등록
 commands.register(app);
-modals.register(app);
 meetups.register(app);
 
 // 전역 에러 처리

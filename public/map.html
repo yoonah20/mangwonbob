@@ -928,7 +928,9 @@ async function visit(restaurantId, btn) {
   try {
     const res = await fetch('/api/visit', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ restaurantId, userId: USER.id, userName: USER.name }),
+      body: JSON.stringify({
+        restaurantId, userId: USER.id, userName: USER.name, channelId: USER.channel,
+      }),
     });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || '실패');
