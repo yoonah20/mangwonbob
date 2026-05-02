@@ -13,15 +13,18 @@
     width: 320px; min-width: 320px; background: #fafaf7; border-right: 1px solid #e5e5e5;
     display: flex; flex-direction: column;
   }
-  #sidebar header { padding: 16px; border-bottom: 1px solid #e5e5e5; position: relative; }
+  #sidebar header { padding: 16px; border-bottom: 1px solid #e5e5e5; position: relative; min-width: 0; }
   #sidebar header h1 { margin: 0; font-size: 18px; }
   #sidebar header .stat { font-size: 13px; color: #666; margin-top: 4px; }
   #sidebar header .who { font-size: 12px; color: #10b981; margin-top: 4px; font-weight: 600; }
   #sidebar .toggle { display: none; }
   #search { width: 100%; padding: 8px 10px; margin-top: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
   #presets {
-    display: flex; gap: 4px; margin-top: 8px; overflow-x: auto;
+    display: flex; gap: 4px; margin-top: 8px;
+    width: 100%; max-width: 100%; min-width: 0;
+    overflow-x: auto; overflow-y: hidden;
     -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    padding-bottom: 4px;
   }
   #presets::-webkit-scrollbar { display: none; }
   #presets button {
@@ -31,8 +34,11 @@
   }
   #presets button.active { background: #10b981; color: #fff; border-color: #10b981; }
   #cats {
-    display: flex; gap: 4px; margin-top: 6px; padding-bottom: 2px;
-    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    display: flex; gap: 4px; margin-top: 6px;
+    width: 100%; max-width: 100%; min-width: 0;
+    overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    padding-bottom: 4px;
   }
   #cats::-webkit-scrollbar { display: none; }
   #cats button {
