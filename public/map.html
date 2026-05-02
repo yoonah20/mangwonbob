@@ -213,11 +213,13 @@ function renderAll() {
       map,
       image: makeMarker(style),
       title: r.name,
-      zIndex: style.size, // 큰 마커가 위에 오게
+      // 1~10 범위 — InfoWindow(999)보다 항상 낮게
+      zIndex: Math.floor(style.size / 5),
     });
     const info = new kakao.maps.InfoWindow({
       content: buildInfoContent(r),
       removable: true,
+      zIndex: 999,
     });
     kakao.maps.event.addListener(marker, 'click', () => openMarker(idx));
     markers.push(marker); infos.push(info);
@@ -260,6 +262,7 @@ function renderAll() {
 function openMarker(idx) {
   if (openInfo) openInfo.close();
   infos[idx].open(map, markers[idx]);
+  if (typeof infos[idx].setZIndex === 'function') infos[idx].setZIndex(999);
   openInfo = infos[idx];
   document.querySelectorAll('#list .item').forEach((el, i) => {
     el.classList.toggle('active', parseInt(el.dataset.idx, 10) === idx);
@@ -320,20 +323,24 @@ function selectById(id) {
 }
 
 async function visit(restaurantId, btn) {
-  if (!USER.id) return;
+  if (!USER.id) return alert('슬랙에서 /밥 지도 명령으로 열어야 체크인할 수 있어요');
   btn.disabled = true;
+  btn.textContent = '저장 중…';
   try {
     const res = await fetch('/api/visit', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ restaurantId, userId: USER.id, userName: USER.name }),
     });
     const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    const msgs = ['✅ 방문 기록!'];
+    if (!res.ok || data.error) throw new Error(data.error || '실패');
+    const msgs = ['✅ 방문 기록 완료!'];
     if (data.isFirstDiscoverer) msgs.push('🏴 첫 발견자!');
     if (data.isRegular) msgs.push(`👑 단골 (${data.userVisitCount}회)`);
-    document.getElementById('toast-' + restaurantId).textContent = msgs.join(' · ');
-    setTimeout(() => loadRestaurants(), 800);
+    const toast = document.getElementById('toast-' + restaurantId);
+    if (toast) toast.textContent = msgs.join(' · ');
+    // 데이터 새로고침 후 같은 식당 InfoWindow 다시 열기
+    await loadRestaurants();
+    reopenById(restaurantId);
   } catch (e) {
     btn.disabled = false;
     alert('실패: ' + e.message);
@@ -350,11 +357,20 @@ async function hideRestaurant(restaurantId, btn) {
     });
     if (!res.ok) throw new Error((await res.json()).error || 'failed');
     if (openInfo) openInfo.close();
-    loadRestaurants();
+    openInfo = null;
+    await loadRestaurants();
   } catch (e) {
     btn.disabled = false;
     alert('실패: ' + e.message);
   }
+}
+
+// 식당 ID로 InfoWindow 재오픈
+function reopenById(restaurantId) {
+  const list = window._filtered || restaurants;
+  const idx = list.findIndex(r => r.id === restaurantId);
+  if (idx < 0) return;
+  openMarker(idx);
 }
 
 function openReview(restaurantId, name) {
@@ -395,8 +411,10 @@ async function submitReview() {
       }),
     });
     if (!res.ok) throw new Error((await res.json()).error || 'failed');
+    const id = reviewTarget;
     closeReview();
-    loadRestaurants();
+    await loadRestaurants();
+    reopenById(id);
   } catch (e) {
     alert('실패: ' + e.message);
   }

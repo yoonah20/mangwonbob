@@ -29,6 +29,21 @@ async function searchByCategoryAt({ x, y }, radius, page = 1, size = 15) {
   return data;
 }
 
+// 키워드로 장소 좌표 찾기 (예: "망원파출소")
+async function findLocationByKeyword(keyword) {
+  const { data } = await client.get('/search/keyword.json', {
+    params: { query: keyword, size: 1 },
+  });
+  if (!data.documents || !data.documents.length) return null;
+  const doc = data.documents[0];
+  return {
+    x: parseFloat(doc.x),
+    y: parseFloat(doc.y),
+    name: doc.place_name,
+    address: doc.address_name,
+  };
+}
+
 // Haversine 공식 — 두 좌표 사이 거리(m)
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -40,25 +55,20 @@ function haversine(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-// 회사 반경 내 음식점 수집 — 카카오 카테고리 API의 45개 제한 회피를 위해
-// 3x3 그리드로 9개 지점에서 각각 검색 후 중복 제거
-async function collectAllRestaurants(radius = 500) {
-  const all = new Map();
-
-  // 그리드 격자 간격 (반경의 절반)
+// 한 중심점 + 반경 내 식당 수집 (3x3 그리드로 카카오 45개 제한 회피)
+async function collectAroundCenter(center, radius) {
+  const found = new Map();
   const step = radius / 2;
-  // 위도/경도 1m당 도(degree)
   const mPerLat = 1 / 111000;
-  const mPerLng = 1 / (111000 * Math.cos(OFFICE.y * Math.PI / 180));
-  // 각 지점 검색 반경 (살짝 겹쳐서 누락 방지)
+  const mPerLng = 1 / (111000 * Math.cos(center.y * Math.PI / 180));
   const subRadius = Math.ceil(radius * 0.75);
 
   const points = [];
   for (const dy of [-1, 0, 1]) {
     for (const dx of [-1, 0, 1]) {
       points.push({
-        x: OFFICE.x + dx * step * mPerLng,
-        y: OFFICE.y + dy * step * mPerLat,
+        x: center.x + dx * step * mPerLng,
+        y: center.y + dy * step * mPerLat,
       });
     }
   }
@@ -68,20 +78,33 @@ async function collectAllRestaurants(radius = 500) {
     while (true) {
       const data = await searchByCategoryAt(point, subRadius, page, 15);
       for (const doc of data.documents) {
-        // 회사로부터 실제 거리 재계산
-        const dist = haversine(OFFICE.y, OFFICE.x, parseFloat(doc.y), parseFloat(doc.x));
+        const dist = haversine(center.y, center.x, parseFloat(doc.y), parseFloat(doc.x));
         if (dist > radius) continue;
-        // 중복 제거 + 정확한 거리 갱신
-        if (!all.has(doc.id)) {
-          all.set(doc.id, { ...doc, _distFromOffice: Math.round(dist) });
+        if (!found.has(doc.id)) {
+          found.set(doc.id, { ...doc, _distFromCenter: Math.round(dist) });
         }
       }
       if (data.meta.is_end || page >= 45) break;
       page += 1;
     }
   }
+  return Array.from(found.values());
+}
 
-  return Array.from(all.values());
+// 여러 중심점에서 반경 내 식당 수집 후 중복 제거
+// (회사로부터의 거리는 항상 OFFICE 기준으로 재계산)
+async function collectAllRestaurants(radius = 500, centers = [OFFICE]) {
+  const merged = new Map();
+  for (const center of centers) {
+    const docs = await collectAroundCenter(center, radius);
+    for (const doc of docs) {
+      if (!merged.has(doc.id)) {
+        const dist = haversine(OFFICE.y, OFFICE.x, parseFloat(doc.y), parseFloat(doc.x));
+        merged.set(doc.id, { ...doc, _distFromOffice: Math.round(dist) });
+      }
+    }
+  }
+  return Array.from(merged.values());
 }
 
 // 카카오 응답 → DB 스키마 매핑
@@ -106,7 +129,9 @@ function mapKakaoToRestaurant(doc) {
 module.exports = {
   OFFICE,
   searchByCategoryAt,
+  findLocationByKeyword,
   collectAllRestaurants,
+  collectAroundCenter,
   mapKakaoToRestaurant,
   haversine,
 };

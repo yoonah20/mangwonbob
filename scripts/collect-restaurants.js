@@ -14,9 +14,20 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('🔍 카카오 로컬 API로 망원동 회사 반경 500m 음식점 수집 중...');
-  const docs = await kakao.collectAllRestaurants(500);
-  console.log(`📦 ${docs.length}개 식당 수신`);
+  console.log('🔍 카카오 로컬 API로 망원동 식당 수집 중...');
+
+  // 수집 중심점들 — 회사 + 망원파출소
+  const centers = [kakao.OFFICE];
+  const police = await kakao.findLocationByKeyword('망원파출소');
+  if (police) {
+    console.log(`📍 망원파출소: ${police.name} (${police.address})`);
+    centers.push({ x: police.x, y: police.y });
+  } else {
+    console.log('⚠️ 망원파출소를 찾지 못했습니다. 회사 기준으로만 수집');
+  }
+
+  const docs = await kakao.collectAllRestaurants(500, centers);
+  console.log(`📦 ${docs.length}개 식당 수신 (중심점 ${centers.length}개, 각 500m 반경)`);
 
   // kakao_place_id 기준 중복 제거
   const seen = new Set();
