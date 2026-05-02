@@ -8,29 +8,54 @@ function footer() {
   };
 }
 
-// /밥 응답 — 헤더 + 팀 진척도 + 추천 3곳(이름만) + 지도 버튼
-function homeBlocks({ teamProgress, recommendations, mapUrl }) {
+function catBtn(text, value) {
+  return {
+    type: 'button',
+    text: { type: 'plain_text', text, emoji: true },
+    action_id: 'pick_category',
+    value,
+  };
+}
+
+// /밥 응답 — 대화형: 어떤 거 먹고 싶냐고 물어봄
+function homeBlocks({ teamProgress, mapUrl }) {
   const ratio = teamProgress.total ? teamProgress.discovered / teamProgress.total : 0;
-  const recLines = (recommendations || []).map(({ restaurant: r, comment }) => {
-    const tag = r.discovered
-      ? (r.avgRating >= 4.5 ? '⭐' : r.visitCount >= 10 ? '🔥' : '✅')
-      : '🌫️';
-    const stat = r.discovered
-      ? (r.avgRating ? `⭐${r.avgRating}` : `${r.visitCount || 0}회`)
-      : '미탐험';
-    const head = `${tag} *${r.name}* — ${r.category || ''} · ${stat}`;
-    return comment ? `${head}\n   _${comment}_` : head;
-  }).join('\n');
-
-  const text = [
-    `*${teamProgress.discovered} / ${teamProgress.total}곳* 탐험   ${progressBar(ratio)} ${Math.round(ratio * 100)}%`,
-    recLines ? '' : null,
-    recLines || null,
-  ].filter(x => x !== null).join('\n');
-
   const blocks = [
-    { type: 'header', text: { type: 'plain_text', text: '🍚 오늘의 망원밥' } },
-    { type: 'section', text: { type: 'mrkdwn', text } },
+    { type: 'header', text: { type: 'plain_text', text: '🍚 오늘 뭐 먹지?' } },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `팀 탐험 *${teamProgress.discovered} / ${teamProgress.total}곳*   ${progressBar(ratio)} ${Math.round(ratio * 100)}%\n\n_기분 골라보세요_`,
+      },
+    },
+    {
+      type: 'actions',
+      elements: [
+        catBtn('🎲 아무거나', '_any'),
+        catBtn('🌫️ 안 가본 곳', '_unvisited'),
+        catBtn('🔥 핫플', '_popular'),
+      ],
+    },
+    {
+      type: 'actions',
+      elements: [
+        catBtn('🍚 한식', '한식'),
+        catBtn('🍣 일식', '일식'),
+        catBtn('🥢 중식', '중식'),
+        catBtn('🍕 양식', '양식'),
+      ],
+    },
+    {
+      type: 'actions',
+      elements: [
+        catBtn('☕ 카페', '카페'),
+        catBtn('🍺 술집', '술집'),
+        catBtn('🌶️ 분식', '분식'),
+        catBtn('🍗 치킨', '치킨'),
+        catBtn('🥩 고기', '고기'),
+      ],
+    },
   ];
   if (mapUrl) {
     blocks.push({
@@ -45,6 +70,48 @@ function homeBlocks({ teamProgress, recommendations, mapUrl }) {
     });
   }
   blocks.push(footer());
+  return blocks;
+}
+
+// 카테고리 선택 후 추천 결과
+function pickedBlocks({ category, recommendations, mapUrl }) {
+  const titleMap = {
+    _any: '🎲 아무거나',
+    _unvisited: '🌫️ 안 가본 곳',
+    _popular: '🔥 핫플',
+  };
+  const title = titleMap[category] || `${category}`;
+
+  const recLines = (recommendations || []).map(({ restaurant: r, comment }) => {
+    const tag = r.discovered
+      ? (r.avgRating >= 4.5 ? '⭐' : r.visitCount >= 10 ? '🔥' : '✅')
+      : '🌫️';
+    const stat = r.discovered
+      ? (r.avgRating ? `⭐${r.avgRating}` : `${r.visitCount || 0}회`)
+      : '미탐험';
+    const head = `${tag} *${r.name}* — ${r.category || ''} · ${stat}`;
+    return comment ? `${head}\n   _${comment}_` : head;
+  }).join('\n');
+
+  const blocks = [
+    { type: 'header', text: { type: 'plain_text', text: `${title} 추천 🍚` } },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: recLines || '_여기엔 추천할 곳이 없네요_' },
+    },
+    {
+      type: 'actions',
+      elements: [
+        { type: 'button', text: { type: 'plain_text', text: '🔄 다른 추천' },
+          action_id: 'pick_category', value: category },
+        { type: 'button', text: { type: 'plain_text', text: '⬅️ 다시 고르기' },
+          action_id: 'back_to_home' },
+        ...(mapUrl ? [{ type: 'button', text: { type: 'plain_text', text: '🗺️ 지도' },
+          url: mapUrl, action_id: 'open_map_view', style: 'primary' }] : []),
+      ],
+    },
+    footer(),
+  ];
   return blocks;
 }
 
@@ -115,6 +182,7 @@ function meetupAnnounceBlocks({ meetup, restaurant, participants }) {
 
 module.exports = {
   homeBlocks,
+  pickedBlocks,
   firstDiscoveryBlocks,
   meetupAnnounceBlocks,
   footer,

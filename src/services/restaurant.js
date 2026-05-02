@@ -35,8 +35,27 @@ async function getRecommendations(category = null, limit = 3) {
   return Promise.all(list.map(r => getRestaurantWithStatus(r.id)));
 }
 
+// 미탐험 식당 추천
+async function getUnvisitedPicks(limit = 3) {
+  const list = await db.listUnknownRestaurants(null, limit);
+  return Promise.all(list.map(r => getRestaurantWithStatus(r.id)));
+}
+
+// 인기 식당 추천 (방문 횟수 많은 순)
+async function getPopularPicks(limit = 3) {
+  const list = await db.listDiscoveredRestaurants(null, 50);
+  // 방문수 추가 후 정렬, 상위 N
+  const enriched = await Promise.all(list.map(r => getRestaurantWithStatus(r.id)));
+  return enriched
+    .filter(r => r.visitCount > 0)
+    .sort((a, b) => b.visitCount - a.visitCount)
+    .slice(0, limit);
+}
+
 module.exports = {
   getRestaurantWithStatus,
   findByName,
   getRecommendations,
+  getUnvisitedPicks,
+  getPopularPicks,
 };
