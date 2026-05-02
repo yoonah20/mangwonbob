@@ -31,29 +31,19 @@
   #sidebar .toggle { display: none; }
   #search { width: 100%; padding: 8px 10px; margin-top: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
   #presets {
-    display: flex; gap: 4px; margin-top: 8px;
-    width: 100%; max-width: 100%; min-width: 0;
-    overflow-x: auto; overflow-y: hidden;
-    -webkit-overflow-scrolling: touch; scrollbar-width: none;
-    padding-bottom: 4px;
+    display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;
   }
-  #presets::-webkit-scrollbar { display: none; }
   #presets button {
-    flex: 0 0 auto; padding: 5px 10px; font-size: 12px;
+    padding: 5px 10px; font-size: 12px;
     background: #fff; border: 1px solid #ddd; border-radius: 999px;
     cursor: pointer; white-space: nowrap; transition: all 0.15s;
   }
   #presets button.active { background: #10b981; color: #fff; border-color: #10b981; }
   #cats {
-    display: flex; gap: 4px; margin-top: 6px;
-    width: 100%; max-width: 100%; min-width: 0;
-    overflow-x: auto; overflow-y: hidden;
-    -webkit-overflow-scrolling: touch; scrollbar-width: none;
-    padding-bottom: 4px;
+    display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;
   }
-  #cats::-webkit-scrollbar { display: none; }
   #cats button {
-    flex: 0 0 auto; padding: 4px 9px; font-size: 11px;
+    padding: 4px 9px; font-size: 11px;
     background: #f3f4f6; border: 1px solid transparent; border-radius: 999px;
     cursor: pointer; white-space: nowrap;
   }
