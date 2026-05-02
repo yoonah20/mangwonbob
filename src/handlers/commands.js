@@ -1,6 +1,7 @@
 // /밥 슬래시 커맨드 — 지도 진입점만
 const db = require('../db/queries');
 const restaurantSvc = require('../services/restaurant');
+const deepseek = require('../services/deepseek');
 const blocks = require('../utils/blocks');
 
 function buildMapUrl(userId, userName, channelId) {
@@ -31,7 +32,17 @@ function register(app) {
 async function renderHome(userId, userName, channelId) {
   const teamProgress = await db.getTeamProgress();
   const recommendations = await restaurantSvc.getRecommendations(null, 3);
-  const enriched = recommendations.filter(Boolean).map(r => ({ restaurant: r }));
+  const enriched = await Promise.all(
+    recommendations.filter(Boolean).map(async (r) => ({
+      restaurant: r,
+      comment: await deepseek.generateRecommendation(r, {
+        discovered: r.discovered,
+        avgRating: r.avgRating,
+        reviewCount: r.reviewCount,
+        sampleComment: r.latestReview?.comment,
+      }),
+    }))
+  );
   return {
     response_type: 'ephemeral',
     text: '🍚 오늘의 망원밥',

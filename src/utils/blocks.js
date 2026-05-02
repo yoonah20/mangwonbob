@@ -11,14 +11,15 @@ function footer() {
 // /밥 응답 — 헤더 + 팀 진척도 + 추천 3곳(이름만) + 지도 버튼
 function homeBlocks({ teamProgress, recommendations, mapUrl }) {
   const ratio = teamProgress.total ? teamProgress.discovered / teamProgress.total : 0;
-  const recLines = (recommendations || []).map(({ restaurant: r }) => {
+  const recLines = (recommendations || []).map(({ restaurant: r, comment }) => {
     const tag = r.discovered
       ? (r.avgRating >= 4.5 ? '⭐' : r.visitCount >= 10 ? '🔥' : '✅')
       : '🌫️';
     const stat = r.discovered
       ? (r.avgRating ? `⭐${r.avgRating}` : `${r.visitCount || 0}회`)
       : '미탐험';
-    return `${tag} *${r.name}* — ${r.category || ''} · ${stat}`;
+    const head = `${tag} *${r.name}* — ${r.category || ''} · ${stat}`;
+    return comment ? `${head}\n   _${comment}_` : head;
   }).join('\n');
 
   const text = [
