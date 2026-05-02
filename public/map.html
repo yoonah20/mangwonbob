@@ -1175,13 +1175,14 @@ async function submitReview() {
 // 식당 상태/인기/평점 → 마커 스타일
 function getMarkerStyle(r) {
   if (!r.discovered) {
-    return { color: '#cbd5e1', size: 22, emoji: '', glow: false, ring: null };
+    // 속이 빈 보라색 원 — 회색 지도 위에서도 잘 보이고 "미탐험" 의미 명확
+    return { color: '#7c3aed', size: 22, emoji: '?', glow: false, ring: null, hollow: true };
   }
   const rating = parseFloat(r.avg_rating) || 0;
   const visits = r.visit_count || 0;
 
   // 기본 (탐험 완료)
-  let style = { color: '#f59e0b', size: 28, emoji: categoryEmoji(r.category), glow: false, ring: null };
+  let style = { color: '#f59e0b', size: 28, emoji: categoryEmoji(r.category), glow: false, ring: null, hollow: false };
   // 단골 인기 (10회+)
   if (visits >= 10) { style.size = 36; style.color = '#ef4444'; style.glow = true; style.ring = '🔥'; }
   // 별점 우수 (4.5+)
@@ -1207,7 +1208,7 @@ function categoryEmoji(cat) {
 
 // SVG 마커 — 글로우/인기 링 표현
 function makeMarker(style) {
-  const { color, size, emoji, glow, ring } = style;
+  const { color, size, emoji, glow, ring, hollow } = style;
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 3;
@@ -1219,18 +1220,23 @@ function makeMarker(style) {
     </filter></defs>` : '';
   const filterAttr = glow ? `filter="url(#g${size}${color.replace('#','')})"` : '';
 
+  // 속 빈 마커: 흰 배경 + 진한 외곽선 / 일반 마커: 색 채움 + 흰 외곽선
+  const fill = hollow ? 'white' : color;
+  const stroke = hollow ? color : 'white';
+  const strokeWidth = hollow ? 3 : 2.5;
+  const textColor = hollow ? color : 'inherit';
+
   const text = emoji
-    ? `<text x="${cx}" y="${cy + size * 0.16}" text-anchor="middle" font-size="${size * 0.55}" dominant-baseline="middle">${emoji}</text>`
+    ? `<text x="${cx}" y="${cy + size * 0.16}" text-anchor="middle" font-size="${size * 0.55}" font-weight="bold" fill="${textColor}" dominant-baseline="middle">${emoji}</text>`
     : '';
 
-  // 인기 표시 — 우상단 작은 원 + 이모지
   const ringSvg = ring ? `
     <circle cx="${size - 6}" cy="6" r="7" fill="white" stroke="${color}" stroke-width="1.5"/>
     <text x="${size - 6}" y="9" text-anchor="middle" font-size="9">${ring}</text>` : '';
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     ${filterDef}
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" stroke="white" stroke-width="2.5" ${filterAttr}/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" ${filterAttr}/>
     ${text}
     ${ringSvg}
   </svg>`;
