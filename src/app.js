@@ -11,6 +11,7 @@ const commands = require('./handlers/commands');
 const modals = require('./handlers/modals');
 const meetups = require('./handlers/meetups');
 const reviewSvc = require('./services/review');
+const badgesSvc = require('./services/badges');
 const blocks = require('./utils/blocks');
 
 // JSON 바디 파싱 (지도 뷰 API용)
@@ -233,6 +234,44 @@ expressApp.post('/api/hide', expressJson, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// 퇴출 복구
+expressApp.post('/api/unhide', expressJson, async (req, res) => {
+  try {
+    const { restaurantId } = req.body;
+    if (!restaurantId) return res.status(400).json({ error: 'missing params' });
+    await db.unhideRestaurant(restaurantId);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 퇴출된 식당 목록
+expressApp.get('/api/hidden', async (_req, res) => {
+  try {
+    const list = await db.listHiddenRestaurants();
+    res.json(list);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 사용자 뱃지 (지도 사이드바용)
+expressApp.get('/api/badges', async (req, res) => {
+  try {
+    const userId = req.query.user;
+    if (!userId) return res.json({ stats: {}, badges: [] });
+    const result = await badgesSvc.getUserBadges(userId);
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 즐겨찾기 토글
+expressApp.post('/api/favorite', expressJson, async (req, res) => {
+  try {
+    const { restaurantId, userId } = req.body;
+    if (!restaurantId || !userId) return res.status(400).json({ error: 'missing params' });
+    const result = await db.toggleFavorite(userId, restaurantId);
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // 핸들러 등록

@@ -111,7 +111,9 @@ async function listUnknownRestaurants(category = null, limit = 5) {
   return rows;
 }
 
-// 추천 식당 (탐험 + 미탐험 섞어서)
+// 추천 식당 — 가중치 점수 기반
+// score = 평점 + 인기도(log) + 거리역가중 + 작은 랜덤 노이즈
+// 그리고 미탐험을 1자리 이상 항상 포함시켜 발견 동기 유지
 async function listRecommendedRestaurants(category = null, limit = 3) {
   const params = [];
   let where = `WHERE COALESCE(r.hidden, FALSE) = FALSE`;
@@ -119,16 +121,38 @@ async function listRecommendedRestaurants(category = null, limit = 3) {
     params.push(`%${category}%`);
     where += ` AND r.category ILIKE $${params.length}`;
   }
-  params.push(limit);
-  const { rows } = await q(
-    `SELECT r.*,
-       EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id) AS discovered
-     FROM restaurants r
-     ${where}
-     ORDER BY RANDOM() LIMIT $${params.length}`,
+
+  // 점수 계산 — Postgres에서 한 번에
+  const scoreSql = `
+    SELECT r.*,
+      EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id) AS discovered,
+      (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id)::int AS visit_count,
+      (SELECT ROUND(AVG(rating)::numeric, 2) FROM reviews WHERE restaurant_id = r.id) AS avg_rating,
+      (
+        COALESCE((SELECT AVG(rating) FROM reviews WHERE restaurant_id = r.id), 3.0)
+        + LN(GREATEST((SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id), 1) + 1) * 0.4
+        - (COALESCE(r.distance_from_office, 500) / 500.0) * 0.5
+        + RANDOM() * 0.6
+      ) AS score
+    FROM restaurants r
+    ${where}
+  `;
+
+  // 발견된 곳 중 상위 + 미탐험 중 1곳 — 합쳐서 limit
+  const discoveredCount = Math.max(limit - 1, 1);
+  const { rows: top } = await q(
+    `SELECT * FROM (${scoreSql}) sub
+     WHERE discovered = TRUE
+     ORDER BY score DESC LIMIT ${discoveredCount}`,
     params
   );
-  return rows;
+  const { rows: unknown } = await q(
+    `SELECT * FROM (${scoreSql}) sub
+     WHERE discovered = FALSE
+     ORDER BY score DESC LIMIT ${limit - top.length}`,
+    params
+  );
+  return [...top, ...unknown].slice(0, limit);
 }
 
 // ─── 방문 ─────────────────────────────────────────────
@@ -390,9 +414,10 @@ async function listAllRestaurantsWithStatus(userId = null) {
     ? `,
        EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id AND v.slack_user_id = $1) AS visited_by_me,
        (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id AND slack_user_id = $1)::int AS my_visit_count,
-       (SELECT json_build_object('rating', rating, 'comment', comment, 'tags', tags)
+       EXISTS (SELECT 1 FROM favorites f WHERE f.restaurant_id = r.id AND f.slack_user_id = $1) AS is_favorite,
+       (SELECT json_build_object('rating', rating, 'comment', comment, 'tags', tags, 'created_at', created_at)
         FROM reviews WHERE restaurant_id = r.id AND slack_user_id = $1 LIMIT 1) AS my_review`
-    : `, FALSE AS visited_by_me, 0 AS my_visit_count, NULL AS my_review`;
+    : `, FALSE AS visited_by_me, 0 AS my_visit_count, FALSE AS is_favorite, NULL AS my_review`;
   const sql = `SELECT r.*,
        EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id) AS discovered,
        (SELECT ROUND(AVG(rating)::numeric, 1) FROM reviews WHERE restaurant_id = r.id) AS avg_rating,
@@ -416,6 +441,35 @@ async function hideRestaurant(id) {
   await q(`UPDATE restaurants SET hidden = TRUE WHERE id = $1`, [id]);
 }
 
+async function unhideRestaurant(id) {
+  await q(`UPDATE restaurants SET hidden = FALSE WHERE id = $1`, [id]);
+}
+
+// 퇴출된 식당 목록
+async function listHiddenRestaurants() {
+  const { rows } = await q(
+    `SELECT * FROM restaurants WHERE hidden = TRUE ORDER BY name ASC`
+  );
+  return rows;
+}
+
+// 즐겨찾기
+async function toggleFavorite(userId, restaurantId) {
+  const { rows } = await q(
+    `SELECT id FROM favorites WHERE slack_user_id = $1 AND restaurant_id = $2`,
+    [userId, restaurantId]
+  );
+  if (rows.length) {
+    await q(`DELETE FROM favorites WHERE id = $1`, [rows[0].id]);
+    return { favorited: false };
+  }
+  await q(
+    `INSERT INTO favorites (slack_user_id, restaurant_id) VALUES ($1, $2)`,
+    [userId, restaurantId]
+  );
+  return { favorited: true };
+}
+
 module.exports = {
   pool,
   q,
@@ -429,6 +483,9 @@ module.exports = {
   listRecommendedRestaurants,
   listAllRestaurantsWithStatus,
   hideRestaurant,
+  unhideRestaurant,
+  listHiddenRestaurants,
+  toggleFavorite,
   addVisit,
   userHasVisited,
   cancelLatestVisit,

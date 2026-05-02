@@ -171,24 +171,29 @@ function visitConfirmBlocks(restaurant, { isFirstDiscoverer, userVisitCount, isR
 }
 
 // /밥 탐험 — 개인 현황
-function explorationBlocks(userId, exp) {
+function explorationBlocks(userId, exp, badges) {
   const ratio = exp.totalRestaurants ? exp.discoveredCount / exp.totalRestaurants : 0;
   const firstNames = exp.firstDiscoveries.slice(0, 5).map(r => r.name).join(', ') || '아직 없음';
   const regularNames = exp.regulars.slice(0, 5)
     .map(r => `${r.name} ${r.visit_count}회`).join(', ') || '아직 없음';
 
-  const text = [
+  const lines = [
     `🗺️ *${mention(userId)}의 탐험 기록*`,
     '━━━━━━━━━━━━━━━━━━━',
     `발견한 식당   *${exp.discoveredCount} / ${exp.totalRestaurants}곳*   ${progressBar(ratio)} ${Math.round(ratio * 100)}%`,
     `🏴 첫 발견      *${exp.firstCount}곳* (${firstNames})`,
     `👑 단골 (3회+)  *${exp.regulars.length}곳* (${regularNames})`,
     `🥈 팀 내 순위   *${exp.rank}위 / ${exp.totalUsers}명*`,
-    '━━━━━━━━━━━━━━━━━━━',
-  ].join('\n');
+  ];
+  if (badges && badges.length) {
+    lines.push('');
+    lines.push('🏆 *획득 뱃지*');
+    badges.forEach(b => lines.push(`${b.emoji} *${b.label}* — _${b.sub}_`));
+  }
+  lines.push('━━━━━━━━━━━━━━━━━━━');
 
   return [
-    { type: 'section', text: { type: 'mrkdwn', text } },
+    { type: 'section', text: { type: 'mrkdwn', text: lines.join('\n') } },
     footer(),
   ];
 }

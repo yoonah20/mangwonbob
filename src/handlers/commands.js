@@ -3,6 +3,7 @@ const db = require('../db/queries');
 const restaurantSvc = require('../services/restaurant');
 const reviewSvc = require('../services/review');
 const rankingSvc = require('../services/ranking');
+const badges = require('../services/badges');
 const deepseek = require('../services/deepseek');
 const blocks = require('../utils/blocks');
 
@@ -142,11 +143,14 @@ function buildMapUrl(userId, userName, channelId) {
 }
 
 async function renderExploration(userId) {
-  const exp = await rankingSvc.getUserExploration(userId);
+  const [exp, b] = await Promise.all([
+    rankingSvc.getUserExploration(userId),
+    badges.getUserBadges(userId),
+  ]);
   return {
     response_type: 'ephemeral',
     text: '🗺️ 내 탐험 기록',
-    blocks: blocks.explorationBlocks(userId, exp),
+    blocks: blocks.explorationBlocks(userId, exp, b.badges),
   };
 }
 
