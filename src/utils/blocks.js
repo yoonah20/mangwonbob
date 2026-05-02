@@ -94,7 +94,7 @@ function restaurantBlocks(r, comment) {
 }
 
 // /밥 응답 — 탐험 현황 + 추천 3곳
-function homeBlocks({ teamProgress, recommendations }) {
+function homeBlocks({ teamProgress, recommendations, mapUrl }) {
   const ratio = teamProgress.total ? teamProgress.discovered / teamProgress.total : 0;
   const blocks = [
     {
@@ -108,12 +108,23 @@ function homeBlocks({ teamProgress, recommendations }) {
         text: `*팀 탐험 현황*  ${teamProgress.discovered} / ${teamProgress.total}곳   ${progressBar(ratio)}  ${Math.round(ratio * 100)}%`,
       },
     },
-    { type: 'divider' },
-    {
-      type: 'section',
-      text: { type: 'mrkdwn', text: '*✨ 오늘의 추천 식당*' },
-    },
   ];
+  if (mapUrl) {
+    blocks.push({
+      type: 'actions',
+      elements: [{
+        type: 'button',
+        text: { type: 'plain_text', text: '🗺️ 지도에서 보기' },
+        url: mapUrl,
+        action_id: 'open_map_view',
+        style: 'primary',
+      }],
+    });
+  }
+  blocks.push(
+    { type: 'divider' },
+    { type: 'section', text: { type: 'mrkdwn', text: '*✨ 오늘의 추천 식당*' } },
+  );
   recommendations.forEach((rec, i) => {
     if (i > 0) blocks.push({ type: 'divider' });
     blocks.push(...restaurantBlocks(rec.restaurant, rec.comment));

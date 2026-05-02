@@ -358,7 +358,7 @@ function buildInfoContent(r) {
       ${canAct ? `<button class="primary" onclick="visit(${r.id}, this)">${visitLabel}</button>` : ''}
       ${reviewBtn}
       <a class="btn" href="${r.kakao_url}" target="_blank">카카오맵 →</a>
-      ${canAct ? `<button class="danger" onclick="hideRestaurant(${r.id}, this)">숨김</button>` : ''}
+      ${canAct ? `<button class="danger" onclick="hideRestaurant(${r.id}, this)">⛔ 퇴출</button>` : ''}
     </div>
     <div class="toast" id="toast-${r.id}"></div>
     ${nearbyHtml}
@@ -400,7 +400,7 @@ async function visit(restaurantId, btn) {
 }
 
 async function hideRestaurant(restaurantId, btn) {
-  if (!confirm('이 식당을 목록에서 숨길까요?\n(배달 전문 등 갈 수 없는 곳)')) return;
+  if (!confirm('이 식당을 망원밥에서 퇴출할까요?\n(배달 전문 등 찾아갈 수 없는 곳)\n\n복구하려면 DB에서 직접 hidden=false로 바꿔야 합니다.')) return;
   btn.disabled = true;
   try {
     const res = await fetch('/api/hide', {
