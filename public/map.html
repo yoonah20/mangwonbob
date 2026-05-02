@@ -561,6 +561,11 @@ async function visit(restaurantId, btn) {
     // 데이터 새로고침 후 같은 식당 InfoWindow 다시 열기
     await loadRestaurants();
     reopenById(restaurantId);
+    // 첫 체크인 후 자동으로 리뷰 모달 띄우기 (이미 리뷰 있으면 패스)
+    const r = restaurants.find(x => x.id === restaurantId);
+    if (r && !r.my_review) {
+      setTimeout(() => openReview(restaurantId, r.name), 350);
+    }
   } catch (e) {
     btn.disabled = false;
     alert('실패: ' + e.message);
