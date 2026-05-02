@@ -90,6 +90,18 @@ expressApp.post('/api/visit', expressJson, async (req, res) => {
   }
 });
 
+// 체크인 취소 (가장 최근 방문 1건 삭제)
+expressApp.post('/api/visit/cancel', expressJson, async (req, res) => {
+  try {
+    const { restaurantId, userId } = req.body;
+    if (!restaurantId || !userId) return res.status(400).json({ error: 'missing params' });
+    const result = await db.cancelLatestVisit(restaurantId, userId);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 지도에서 리뷰 작성 — 체크인한 식당만 가능
 expressApp.post('/api/review', expressJson, async (req, res) => {
   try {

@@ -108,27 +108,26 @@ function homeBlocks({ teamProgress, recommendations, mapUrl }) {
         text: `*팀 탐험 현황*  ${teamProgress.discovered} / ${teamProgress.total}곳   ${progressBar(ratio)}  ${Math.round(ratio * 100)}%`,
       },
     },
+    { type: 'divider' },
+    { type: 'section', text: { type: 'mrkdwn', text: '*✨ 오늘의 추천 식당*' } },
   ];
+  recommendations.forEach((rec, i) => {
+    if (i > 0) blocks.push({ type: 'divider' });
+    blocks.push(...restaurantBlocks(rec.restaurant, rec.comment));
+  });
   if (mapUrl) {
+    blocks.push({ type: 'divider' });
     blocks.push({
       type: 'actions',
       elements: [{
         type: 'button',
-        text: { type: 'plain_text', text: '🗺️ 지도에서 보기' },
+        text: { type: 'plain_text', text: '🗺️ 지도에서 전체 보기' },
         url: mapUrl,
         action_id: 'open_map_view',
         style: 'primary',
       }],
     });
   }
-  blocks.push(
-    { type: 'divider' },
-    { type: 'section', text: { type: 'mrkdwn', text: '*✨ 오늘의 추천 식당*' } },
-  );
-  recommendations.forEach((rec, i) => {
-    if (i > 0) blocks.push({ type: 'divider' });
-    blocks.push(...restaurantBlocks(rec.restaurant, rec.comment));
-  });
   blocks.push(footer());
   return blocks;
 }

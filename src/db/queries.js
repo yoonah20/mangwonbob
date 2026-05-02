@@ -155,6 +155,32 @@ async function userHasVisited(restaurantId, userId) {
   return rows.length > 0;
 }
 
+// 체크인 취소 — 본인의 가장 최근 방문 기록 1건 삭제
+// 첫 발견자 이전이면 다음 방문자에게 발견자 플래그를 넘김
+async function cancelLatestVisit(restaurantId, userId) {
+  const { rows } = await q(
+    `SELECT id, is_first_discoverer FROM visits
+     WHERE restaurant_id = $1 AND slack_user_id = $2
+     ORDER BY visited_at DESC LIMIT 1`,
+    [restaurantId, userId]
+  );
+  if (!rows.length) return { canceled: false };
+  const visit = rows[0];
+  await q(`DELETE FROM visits WHERE id = $1`, [visit.id]);
+
+  // 첫 발견자 플래그 이전
+  if (visit.is_first_discoverer) {
+    const { rows: next } = await q(
+      `SELECT id FROM visits WHERE restaurant_id = $1 ORDER BY visited_at ASC LIMIT 1`,
+      [restaurantId]
+    );
+    if (next.length) {
+      await q(`UPDATE visits SET is_first_discoverer = TRUE WHERE id = $1`, [next[0].id]);
+    }
+  }
+  return { canceled: true };
+}
+
 async function countUserVisits(restaurantId, userId) {
   const { rows } = await q(
     `SELECT COUNT(*)::int AS c FROM visits WHERE restaurant_id = $1 AND slack_user_id = $2`,
@@ -164,7 +190,21 @@ async function countUserVisits(restaurantId, userId) {
 }
 
 // ─── 리뷰 ─────────────────────────────────────────────
+// 한 식당당 한 사람 한 리뷰 — 있으면 업데이트, 없으면 새로 작성
 async function addReview({ restaurantId, userId, userName, rating, comment, tags }) {
+  const existing = await q(
+    `SELECT id FROM reviews WHERE restaurant_id = $1 AND slack_user_id = $2 LIMIT 1`,
+    [restaurantId, userId]
+  );
+  if (existing.rows.length) {
+    const { rows } = await q(
+      `UPDATE reviews SET rating = $1, comment = $2, tags = $3,
+         slack_user_name = $4, created_at = NOW()
+       WHERE id = $5 RETURNING *`,
+      [rating, comment, tags || [], userName, existing.rows[0].id]
+    );
+    return rows[0];
+  }
   const { rows } = await q(
     `INSERT INTO reviews (restaurant_id, slack_user_id, slack_user_name, rating, comment, tags)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
@@ -275,14 +315,18 @@ async function getRegularKing(limit = 5) {
 
 // 모든 식당 + 상태 (지도 뷰용)
 async function listAllRestaurantsWithStatus(userId = null) {
-  const meCol = userId
-    ? `, EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id AND v.slack_user_id = $1) AS visited_by_me`
-    : `, FALSE AS visited_by_me`;
+  const meCols = userId
+    ? `,
+       EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id AND v.slack_user_id = $1) AS visited_by_me,
+       (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id AND slack_user_id = $1)::int AS my_visit_count,
+       (SELECT json_build_object('rating', rating, 'comment', comment, 'tags', tags)
+        FROM reviews WHERE restaurant_id = r.id AND slack_user_id = $1 LIMIT 1) AS my_review`
+    : `, FALSE AS visited_by_me, 0 AS my_visit_count, NULL AS my_review`;
   const sql = `SELECT r.*,
        EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id) AS discovered,
        (SELECT ROUND(AVG(rating)::numeric, 1) FROM reviews WHERE restaurant_id = r.id) AS avg_rating,
        (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id)::int AS visit_count
-       ${meCol}
+       ${meCols}
      FROM restaurants r
      WHERE COALESCE(r.hidden, FALSE) = FALSE
      ORDER BY r.distance_from_office ASC`;
@@ -310,6 +354,7 @@ module.exports = {
   hideRestaurant,
   addVisit,
   userHasVisited,
+  cancelLatestVisit,
   countUserVisits,
   addReview,
   getLatestReview,

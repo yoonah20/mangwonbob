@@ -76,8 +76,8 @@
   }
   .modal h2 { margin: 0 0 12px; font-size: 18px; }
   .modal label { display: block; font-size: 13px; margin-top: 12px; color: #555; }
-  .modal .stars { font-size: 28px; cursor: pointer; user-select: none; }
-  .modal .stars span { opacity: 0.3; transition: opacity 0.1s; }
+  .modal .stars { display: inline-flex; gap: 0; font-size: 32px; cursor: pointer; user-select: none; line-height: 1; letter-spacing: -0.05em; }
+  .modal .stars span { opacity: 0.25; transition: opacity 0.1s; padding: 0; color: #f59e0b; }
   .modal .stars span.on { opacity: 1; }
   .modal textarea {
     width: 100%; min-height: 70px; padding: 8px; margin-top: 6px;
@@ -157,10 +157,7 @@
   <div class="modal">
     <h2 id="reviewTitle">리뷰 작성</h2>
     <label>별점</label>
-    <div class="stars" id="stars">
-      <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span>
-      <span data-v="4">★</span><span data-v="5">★</span>
-    </div>
+    <div class="stars" id="stars"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
     <label>한 줄 코멘트 (선택)</label>
     <textarea id="reviewComment" placeholder="국물이 진해요, 점심 특선 추천 등"></textarea>
     <label>태그 (선택)</label>
@@ -329,6 +326,11 @@ function buildInfoContent(r) {
     rating >= 4.5 ? '<span class="badge star">⭐ 4.5+</span>' : '',
   ].join('');
 
+  // 본인 방문 카운트
+  const myCount = r.my_visit_count || 0;
+  const meLine = myCount > 0
+    ? `<div class="meta" style="color:#10b981">🥾 내가 ${myCount}회 방문</div>` : '';
+
   // 같은 위치(15m 이내) 다른 가게
   const nearby = restaurants.filter(o =>
     o.id !== r.id &&
@@ -340,22 +342,25 @@ function buildInfoContent(r) {
       ${nearby.map(n => `<a class="nearby-item" onclick="selectById(${n.id})">${esc(n.name)}</a>`).join('')}
     </div>` : '';
 
-  // 리뷰 버튼 — 본인이 체크인한 식당만 활성화
+  // 리뷰 버튼 — 체크인한 사람만, 기존 리뷰 있으면 수정
   let reviewBtn = '';
-  if (canAct) {
-    if (r.visited_by_me) {
-      reviewBtn = `<button onclick="openReview(${r.id}, '${esc(r.name).replace(/'/g, "\\'")}')">리뷰 ✍️</button>`;
-    } else {
-      reviewBtn = `<button disabled title="먼저 체크인부터!" style="opacity:0.4;cursor:not-allowed">리뷰 (체크인 필요)</button>`;
-    }
+  if (canAct && r.visited_by_me) {
+    const label = r.my_review ? '리뷰 수정 ✏️' : '리뷰 작성 ✍️';
+    reviewBtn = `<button onclick="openReview(${r.id}, '${esc(r.name).replace(/'/g, "\\'")}')">${label}</button>`;
   }
+
+  // 체크인 취소 버튼 — 본인 방문이 있을 때만
+  const cancelBtn = canAct && myCount > 0
+    ? `<button onclick="cancelVisit(${r.id}, this)">취소 ↩</button>` : '';
 
   return `<div class="iw">
     <div class="title">${categoryEmoji(r.category)} ${esc(r.name)}${badges}</div>
     <div class="meta">${esc(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
     <div class="meta">${ratingLine}</div>
+    ${meLine}
     <div class="actions">
       ${canAct ? `<button class="primary" onclick="visit(${r.id}, this)">${visitLabel}</button>` : ''}
+      ${cancelBtn}
       ${reviewBtn}
       <a class="btn" href="${r.kakao_url}" target="_blank">카카오맵 →</a>
       ${canAct ? `<button class="danger" onclick="hideRestaurant(${r.id}, this)">⛔ 퇴출</button>` : ''}
@@ -399,6 +404,28 @@ async function visit(restaurantId, btn) {
   }
 }
 
+async function cancelVisit(restaurantId, btn) {
+  if (!USER.id) return;
+  if (!confirm('가장 최근 체크인 1건을 취소할까요?')) return;
+  btn.disabled = true;
+  btn.textContent = '취소 중…';
+  try {
+    const res = await fetch('/api/visit/cancel', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ restaurantId, userId: USER.id }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || '실패');
+    if (!data.canceled) throw new Error('취소할 체크인이 없어요');
+    await loadRestaurants();
+    reopenById(restaurantId);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '취소 ↩';
+    alert('실패: ' + e.message);
+  }
+}
+
 async function hideRestaurant(restaurantId, btn) {
   if (!confirm('이 식당을 망원밥에서 퇴출할까요?\n(배달 전문 등 찾아갈 수 없는 곳)\n\n복구하려면 DB에서 직접 hidden=false로 바꿔야 합니다.')) return;
   btn.disabled = true;
@@ -428,10 +455,17 @@ function reopenById(restaurantId) {
 function openReview(restaurantId, name) {
   reviewTarget = restaurantId;
   reviewRating = 0;
-  document.getElementById('reviewTitle').textContent = `${name} 리뷰`;
-  document.getElementById('reviewComment').value = '';
-  document.querySelectorAll('#reviewTags input').forEach(c => c.checked = false);
-  setStars(0);
+  // 기존 리뷰가 있으면 prefill
+  const r = restaurants.find(x => x.id === restaurantId);
+  const existing = r && r.my_review;
+  document.getElementById('reviewTitle').textContent =
+    existing ? `${name} 리뷰 수정` : `${name} 리뷰`;
+  document.getElementById('reviewComment').value = existing?.comment || '';
+  const tagSet = new Set(existing?.tags || []);
+  document.querySelectorAll('#reviewTags input').forEach(c => {
+    c.checked = tagSet.has(c.value);
+  });
+  setStars(existing?.rating || 0);
   document.getElementById('reviewModal').classList.add('show');
 }
 
