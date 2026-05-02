@@ -79,21 +79,21 @@
   .empty { padding: 30px; text-align: center; color: #999; }
 
   /* InfoWindow 안의 액션 버튼 */
-  .iw { padding: 12px; font-size: 13px; min-width: 220px; max-width: 300px; line-height: 1.5; word-break: keep-all; }
+  .iw { padding: 12px 38px 12px 12px; font-size: 13px; min-width: 220px; max-width: 300px; line-height: 1.5; word-break: keep-all; position: relative; }
   .iw .title { font-weight: 600; font-size: 14px; line-height: 1.35; }
   .iw .meta { color: #666; font-size: 12px; }
   .iw .badge { display: inline-block; padding: 1px 6px; margin-left: 4px; border-radius: 4px;
     font-size: 10px; font-weight: 600; vertical-align: middle; }
   .iw .badge.hot { background: #fee2e2; color: #dc2626; }
   .iw .badge.star { background: #fef3c7; color: #d97706; }
-  .iw .title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  .iw .title-row .title { flex: 1; min-width: 0; }
   .iw .hide-tiny {
-    flex: 0 0 auto; padding: 2px 6px; font-size: 11px;
-    background: #fff; color: #94a3b8; border: 1px solid #e5e7eb;
-    border-radius: 4px; cursor: pointer; opacity: 0.55;
+    position: absolute; top: 6px; right: 28px;
+    width: 18px; height: 18px; padding: 0; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; background: transparent; border: none;
+    color: #cbd5e1; cursor: pointer; border-radius: 3px;
   }
-  .iw .hide-tiny:hover { color: #dc2626; border-color: #fecaca; opacity: 1; }
+  .iw .hide-tiny:hover { color: #dc2626; background: #fef2f2; }
   .iw .kakao-link {
     display: block; width: 100%; text-align: center; margin-top: 8px;
     padding: 8px 12px; font-size: 12px; font-weight: 600;
@@ -738,10 +738,8 @@ function buildInfoContent(r) {
     : '';
 
   return `<div class="iw">
-    <div class="title-row">
-      <div class="title">${categoryEmoji(r.category)} ${esc(r.name)}${badges}${favStar}</div>
-      ${hideTinyBtn}
-    </div>
+    ${hideTinyBtn}
+    <div class="title">${categoryEmoji(r.category)} ${esc(r.name)}${badges}${favStar}</div>
     <div class="meta">${esc(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
     <div class="meta">${ratingLine}</div>
     ${meLine}
