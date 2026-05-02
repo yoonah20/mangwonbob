@@ -1176,7 +1176,7 @@ async function submitReview() {
 function getMarkerStyle(r) {
   if (!r.discovered) {
     // 속이 빈 보라색 원 — 회색 지도 위에서도 잘 보이고 "미탐험" 의미 명확
-    return { color: '#7c3aed', size: 22, emoji: '?', glow: false, ring: null, hollow: true };
+    return { color: '#a78bfa', size: 22, emoji: '?', glow: false, ring: null, hollow: true };
   }
   const rating = parseFloat(r.avg_rating) || 0;
   const visits = r.visit_count || 0;
@@ -1271,7 +1271,7 @@ function clearRoute() {
 // 카카오 외부 길찾기 URL (도보)
 function kakaoDirectionsUrl(r) {
   const params = new URLSearchParams({
-    sName: '몬스테라하우스', sX: OFFICE.x, sY: OFFICE.y,
+    sName: '월드컵로13길 19-25', sX: OFFICE.x, sY: OFFICE.y,
     eName: r.name, eX: r.longitude, eY: r.latitude,
     target: 'walk',
   });
