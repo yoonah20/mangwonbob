@@ -19,6 +19,31 @@
   #sidebar header .who { font-size: 12px; color: #10b981; margin-top: 4px; font-weight: 600; }
   #sidebar .toggle { display: none; }
   #search { width: 100%; padding: 8px 10px; margin-top: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+  #presets {
+    display: flex; gap: 4px; margin-top: 8px; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  #presets::-webkit-scrollbar { display: none; }
+  #presets button {
+    flex: 0 0 auto; padding: 5px 10px; font-size: 12px;
+    background: #fff; border: 1px solid #ddd; border-radius: 999px;
+    cursor: pointer; white-space: nowrap; transition: all 0.15s;
+  }
+  #presets button.active { background: #10b981; color: #fff; border-color: #10b981; }
+  #cats {
+    display: flex; gap: 4px; margin-top: 6px; padding-bottom: 2px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  #cats::-webkit-scrollbar { display: none; }
+  #cats button {
+    flex: 0 0 auto; padding: 4px 9px; font-size: 11px;
+    background: #f3f4f6; border: 1px solid transparent; border-radius: 999px;
+    cursor: pointer; white-space: nowrap;
+  }
+  #cats button.active { background: #fef3c7; border-color: #f59e0b; color: #92400e; font-weight: 600; }
+  #section-label {
+    padding: 8px 16px 4px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px;
+  }
   #list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .item {
     padding: 12px 16px; border-bottom: 1px solid #eee; cursor: pointer;
@@ -26,9 +51,16 @@
   }
   .item:hover { background: #f0efe8; }
   .item.active { background: #e8f5e9; }
-  .item .name { font-weight: 600; font-size: 14px; }
-  .item .meta { font-size: 12px; color: #666; margin-top: 2px; }
-  .item .status { font-size: 11px; margin-top: 4px; }
+  .item .row1 { display: flex; align-items: center; gap: 6px; }
+  .item .emoji { font-size: 16px; flex: 0 0 auto; }
+  .item .name { font-weight: 600; font-size: 14px; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .stats { font-size: 11px; color: #666; flex: 0 0 auto; white-space: nowrap; }
+  .item .stats .star { color: #f59e0b; font-weight: 600; }
+  .item .stats .hot { color: #dc2626; }
+  .item .stats .me { color: #10b981; }
+  .item .meta { font-size: 12px; color: #888; margin-top: 2px; padding-left: 22px; }
+  .item .status { font-size: 11px; margin-top: 4px; padding-left: 22px; }
   .item .status.disc { color: #f59e0b; }
   .item .status.unk { color: #94a3b8; }
   #map { flex: 1; }
@@ -99,6 +131,8 @@
 
   /* ─── 모바일 (≤768px) ─── */
   @media (max-width: 768px) {
+    #presets button { padding: 6px 11px; font-size: 13px; }
+    #cats button { padding: 5px 10px; font-size: 12px; }
     #app { flex-direction: column; }
     #map { flex: 1; min-height: 0; order: 1; }
     #sidebar {
@@ -145,7 +179,16 @@
       <div class="stat" id="stat">불러오는 중…</div>
       <div class="who" id="who"></div>
       <input id="search" type="text" placeholder="🔍 식당 / 카테고리 검색">
+      <div id="presets">
+        <button class="active" data-preset="near">📍 가까운 순</button>
+        <button data-preset="popular">🔥 핫플</button>
+        <button data-preset="rating">⭐ 평점</button>
+        <button data-preset="my">👑 내 단골</button>
+        <button data-preset="unvisited">🌫️ 미탐험</button>
+      </div>
+      <div id="cats"></div>
     </header>
+    <div id="section-label" hidden></div>
     <div id="list"><div class="empty">로딩 중…</div></div>
     <footer>🌿 by 몬스테라하우스</footer>
   </aside>
@@ -192,6 +235,7 @@ const params = new URLSearchParams(location.search);
 const USER = { id: params.get('user') || '', name: params.get('name') || '' };
 let map, markers = [], infos = [], restaurants = [], openInfo = null;
 let reviewTarget = null, reviewRating = 0;
+let currentPreset = 'near', currentCat = null;
 
 if (USER.id) {
   document.getElementById('who').textContent = `🥾 ${USER.name || USER.id} 으로 체크인`;
@@ -233,14 +277,93 @@ async function loadRestaurants() {
   const url = USER.id ? `/api/restaurants?user=${encodeURIComponent(USER.id)}` : '/api/restaurants';
   const res = await fetch(url);
   restaurants = await res.json();
+  renderCatChips();
   renderAll();
 }
 
+// 카테고리 버킷팅 (이모지 매핑과 일치)
+function categoryBucket(cat) {
+  cat = cat || '';
+  if (/한식|국밥|국수|찌개|찜|족발|보쌈|쌈/.test(cat)) return '한식';
+  if (/일식|초밥|스시|라멘|돈까스|우동|텐동/.test(cat)) return '일식';
+  if (/중식|짜장|마라/.test(cat)) return '중식';
+  if (/양식|파스타|피자|버거|스테이크|이탈리|프렌치/.test(cat)) return '양식';
+  if (/카페|커피|디저트|베이커리|빵|티/.test(cat)) return '카페';
+  if (/술집|호프|바|이자카야|와인|맥주/.test(cat)) return '술집';
+  if (/분식|떡볶이|김밥/.test(cat)) return '분식';
+  if (/치킨/.test(cat)) return '치킨';
+  if (/고기|구이|곱창/.test(cat)) return '고기';
+  if (/아시아|쌀국수|태국|베트남/.test(cat)) return '아시아';
+  return '기타';
+}
+
+const BUCKET_EMOJI = {
+  '한식': '🍚', '일식': '🍣', '중식': '🥢', '양식': '🍕', '카페': '☕',
+  '술집': '🍺', '분식': '🌶️', '치킨': '🍗', '고기': '🥩', '아시아': '🍜', '기타': '🍴',
+};
+
+// 카테고리 칩 동적 생성 (식당 수 많은 순)
+function renderCatChips() {
+  const counts = {};
+  restaurants.forEach(r => {
+    const b = categoryBucket(r.category);
+    counts[b] = (counts[b] || 0) + 1;
+  });
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const el = document.getElementById('cats');
+  el.innerHTML = sorted.map(([cat, n]) =>
+    `<button data-cat="${cat}" class="${currentCat === cat ? 'active' : ''}">
+      ${BUCKET_EMOJI[cat] || ''} ${cat} ${n}</button>`
+  ).join('');
+  el.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      currentCat = currentCat === b.dataset.cat ? null : b.dataset.cat;
+      renderCatChips();
+      renderAll();
+    });
+  });
+}
+
+function applyPreset(list, preset) {
+  switch (preset) {
+    case 'popular':
+      return list
+        .filter(r => (r.visit_count || 0) > 0)
+        .sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0));
+    case 'rating':
+      return list
+        .filter(r => r.avg_rating)
+        .sort((a, b) => parseFloat(b.avg_rating) - parseFloat(a.avg_rating));
+    case 'my':
+      return list
+        .filter(r => (r.my_visit_count || 0) > 0)
+        .sort((a, b) => (b.my_visit_count || 0) - (a.my_visit_count || 0));
+    case 'unvisited':
+      return list
+        .filter(r => !r.visited_by_me)
+        .sort((a, b) => (a.distance_from_office || 0) - (b.distance_from_office || 0));
+    case 'near':
+    default:
+      return [...list].sort((a, b) => (a.distance_from_office || 0) - (b.distance_from_office || 0));
+  }
+}
+
+const PRESET_LABEL = {
+  near: null,
+  popular: '🔥 동료들이 자주 가는 곳',
+  rating: '⭐ 평점이 높은 곳',
+  my: '👑 내가 자주 가는 단골',
+  unvisited: '🌫️ 아직 안 가본 곳',
+};
+
 function renderAll() {
   const q = (document.getElementById('search').value || '').toLowerCase();
-  const filtered = restaurants.filter(r =>
-    !q || r.name.toLowerCase().includes(q) || (r.category || '').toLowerCase().includes(q)
-  );
+  let filtered = restaurants.filter(r => {
+    if (q && !r.name.toLowerCase().includes(q) && !(r.category || '').toLowerCase().includes(q)) return false;
+    if (currentCat && categoryBucket(r.category) !== currentCat) return false;
+    return true;
+  });
+  filtered = applyPreset(filtered, currentPreset);
 
   markers.forEach(m => m.setMap(null));
   markers = []; infos = [];
@@ -264,17 +387,41 @@ function renderAll() {
     markers.push(marker); infos.push(info);
   });
 
+  // 섹션 라벨
+  const labelEl = document.getElementById('section-label');
+  const presetLabel = PRESET_LABEL[currentPreset];
+  if (presetLabel) {
+    labelEl.textContent = `${presetLabel} · ${filtered.length}곳`;
+    labelEl.hidden = false;
+  } else {
+    labelEl.hidden = true;
+  }
+
   const list = document.getElementById('list');
   if (!filtered.length) {
-    list.innerHTML = '<div class="empty">검색 결과 없음</div>';
+    const msg = currentPreset === 'my' ? '아직 단골이 없어요' :
+                currentPreset === 'unvisited' ? '모든 곳을 탐험했네요! 🎉' :
+                currentPreset === 'rating' ? '아직 리뷰가 없어요' :
+                currentPreset === 'popular' ? '아직 방문 기록이 없어요' :
+                '검색 결과 없음';
+    list.innerHTML = `<div class="empty">${msg}</div>`;
   } else {
     list.innerHTML = filtered.map((r, idx) => {
-      const isDisc = r.discovered;
-      const status = isDisc
-        ? `<span class="status disc">✅ 탐험 완료${r.avg_rating ? ' · ⭐ ' + r.avg_rating : ''}</span>`
+      const visits = r.visit_count || 0;
+      const myCount = r.my_visit_count || 0;
+      const rating = r.avg_rating ? `<span class="star">⭐${r.avg_rating}</span>` : '';
+      const hot = visits >= 5 ? `<span class="hot">🔥${visits}</span>` : '';
+      const me = myCount > 0 ? `<span class="me">👑${myCount}</span>` : '';
+      const stats = [rating, hot, me].filter(Boolean).join(' ');
+      const status = r.discovered
+        ? `<span class="status disc">✅ 탐험 완료${visits ? ' · 총 ' + visits + '회' : ''}</span>`
         : `<span class="status unk">🌫️ 미탐험</span>`;
       return `<div class="item" data-idx="${idx}">
-        <div class="name">${esc(r.name)}</div>
+        <div class="row1">
+          <span class="emoji">${categoryEmoji(r.category)}</span>
+          <span class="name">${esc(r.name)}</span>
+          <span class="stats">${stats}</span>
+        </div>
         <div class="meta">${esc(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
         ${status}
       </div>`;
@@ -289,14 +436,24 @@ function renderAll() {
     });
   }
 
-  // 현재 필터 결과를 액션에서 참조하도록 보관
   window._filtered = filtered;
 
   const total = restaurants.length;
   const disc = restaurants.filter(r => r.discovered).length;
+  const filterNote = (q || currentCat || currentPreset !== 'near')
+    ? ` (보이는 ${filtered.length}곳)` : '';
   document.getElementById('stat').textContent =
-    `🗺️ ${disc} / ${total}곳 탐험 완료` + (q ? ` (검색: ${filtered.length}개)` : '');
+    `🗺️ 전체 ${disc} / ${total}곳 탐험 완료${filterNote}`;
 }
+
+// 프리셋 버튼 클릭
+document.querySelectorAll('#presets button').forEach(b => {
+  b.addEventListener('click', () => {
+    currentPreset = b.dataset.preset;
+    document.querySelectorAll('#presets button').forEach(x => x.classList.toggle('active', x === b));
+    renderAll();
+  });
+});
 
 function openMarker(idx) {
   if (openInfo) openInfo.close();
