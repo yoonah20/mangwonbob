@@ -96,6 +96,28 @@ function register(app) {
   });
 
   app.action('open_map_view', async ({ ack }) => { await ack(); });
+
+  // ─── App Home (사이드바에서 앱 클릭 시) ─────────────────
+  app.event('app_home_opened', async ({ event, client }) => {
+    if (event.tab !== 'home') return;
+    try {
+      const teamProgress = await db.getTeamProgress();
+      let userName = '';
+      try {
+        const info = await client.users.info({ user: event.user });
+        userName = info.user.profile?.display_name
+          || info.user.profile?.real_name
+          || info.user.name || '';
+      } catch (e) { /* ignore */ }
+      const mapUrl = buildMapUrl(event.user, userName, process.env.MEETUP_CHANNEL_ID || '');
+      await client.views.publish({
+        user_id: event.user,
+        view: blocks.appHomeView({ teamProgress, mapUrl, userName }),
+      });
+    } catch (e) {
+      console.error('app_home_opened error:', e);
+    }
+  });
 }
 
 module.exports = { register };

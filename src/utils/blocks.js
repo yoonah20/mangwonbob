@@ -180,9 +180,37 @@ function meetupAnnounceBlocks({ meetup, restaurant, participants }) {
   return result;
 }
 
+// App Home — 사이드바에서 망원밥 앱 클릭 시 보이는 화면
+function appHomeView({ teamProgress, mapUrl, userName }) {
+  const ratio = teamProgress.total ? teamProgress.discovered / teamProgress.total : 0;
+  const blocks = [
+    { type: 'header', text: { type: 'plain_text', text: '🍚 망원밥' } },
+    { type: 'section', text: { type: 'mrkdwn',
+      text: `${userName ? `*${userName}* 님, ` : ''}오늘 뭐 먹지?\n팀 탐험 *${teamProgress.discovered} / ${teamProgress.total}곳*   ${progressBar(ratio)} ${Math.round(ratio * 100)}%` } },
+    { type: 'divider' },
+  ];
+  if (mapUrl) {
+    blocks.push({
+      type: 'actions',
+      elements: [{
+        type: 'button',
+        text: { type: 'plain_text', text: '🗺️ 지도 열기' },
+        url: mapUrl,
+        action_id: 'open_map_view',
+        style: 'primary',
+      }],
+    });
+  } else {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '_PUBLIC_URL 환경변수를 설정해주세요_' } });
+  }
+  blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '🌿 망원밥 by 몬스테라하우스 · 채팅에서 `/밥` 으로도 사용 가능' }] });
+  return { type: 'home', blocks };
+}
+
 module.exports = {
   homeBlocks,
   pickedBlocks,
+  appHomeView,
   firstDiscoveryBlocks,
   meetupAnnounceBlocks,
   footer,
