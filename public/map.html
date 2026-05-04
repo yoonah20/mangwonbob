@@ -189,6 +189,8 @@
 
   /* ─── 모바일 (≤768px) ─── */
   @media (max-width: 768px) {
+    /* iOS 자동 확대 방지 — 모든 입력 폰트를 16px 이상으로 */
+    input, textarea, select { font-size: 16px !important; }
     #presets button { padding: 5px 10px; font-size: 12px; }
     #cats button { padding: 4px 8px; font-size: 11px; }
     #app { flex-direction: column; }
