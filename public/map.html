@@ -189,35 +189,41 @@
 
   /* ─── 모바일 (≤768px) ─── */
   @media (max-width: 768px) {
-    #presets button { padding: 6px 11px; font-size: 13px; }
-    #cats button { padding: 5px 10px; font-size: 12px; }
+    #presets button { padding: 5px 10px; font-size: 12px; }
+    #cats button { padding: 4px 8px; font-size: 11px; }
     #app { flex-direction: column; }
     #map { flex: 1; min-height: 0; order: 1; }
     #sidebar {
       position: fixed; left: 0; right: 0; bottom: 0;
       width: 100%; min-width: 0;
-      max-height: 75vh; max-height: 75dvh;
+      max-height: 88vh; max-height: 88dvh;
       border-right: none;
       border-radius: 16px 16px 0 0;
       box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
-      transform: translateY(calc(100% - 110px));
+      transform: translateY(calc(100% - 92px));
       transition: transform 0.28s ease-out;
       z-index: 100;
     }
     #sidebar.expanded { transform: translateY(0); }
-    #sidebar header { padding: 14px 16px 10px; cursor: pointer; user-select: none; }
+    #sidebar header { padding: 10px 14px 8px; cursor: pointer; user-select: none; }
     #sidebar header::before {
       content: ''; display: block; width: 36px; height: 4px;
       background: #d1d5db; border-radius: 2px;
-      margin: -4px auto 8px;
+      margin: -4px auto 6px;
     }
-    #sidebar header h1 { font-size: 16px; }
-    #search { font-size: 16px; /* iOS 자동 확대 방지 */ }
+    #sidebar header h1 { font-size: 15px; }
+    #sidebar header .stat { font-size: 12px; }
+    #sidebar header .who { font-size: 11px; margin-top: 2px; }
+    #search { font-size: 16px; padding: 7px 10px; margin-top: 8px; /* iOS 자동 확대 방지 */ }
+    #presets { margin-top: 6px; gap: 3px; }
+    .cat-label { display: none; }
+    #cats { margin-top: 6px; gap: 3px; padding-top: 6px;
+      border-top: 1px solid #e5e5e5; }
     #list { padding-bottom: 16px; }
-    .item { padding: 14px 16px; }
+    .item { padding: 10px 14px; }
 
     .iw { min-width: 0; max-width: 240px; padding: 10px; }
-    .iw .actions button, .iw .actions a.btn { padding: 8px 10px; font-size: 13px; }
+    .iw .actions button, .iw .actions a.btn { padding: 6px 8px; font-size: 12px; }
 
     .modal-bg { align-items: flex-end; }
     .modal {
