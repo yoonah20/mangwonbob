@@ -263,6 +263,40 @@ async function getRestaurantTags(restaurantId) {
   return rows.map(r => r.tag);
 }
 
+// ─── 활동 피드 ────────────────────────────────────────
+// visits + reviews + meetups를 시간순 통합
+async function getRecentActivity(limit = 20) {
+  const sql = `
+    WITH activity AS (
+      SELECT 'visit' AS kind,
+        v.slack_user_id AS user_id, v.slack_user_name AS user_name,
+        v.restaurant_id, v.is_first_discoverer AS first_discovery,
+        NULL::int AS rating, NULL::text AS comment, v.visited_at AS at
+      FROM visits v
+      UNION ALL
+      SELECT 'review' AS kind,
+        r.slack_user_id, r.slack_user_name,
+        r.restaurant_id, FALSE,
+        r.rating, r.comment, r.created_at
+      FROM reviews r
+      UNION ALL
+      SELECT 'meetup' AS kind,
+        m.organizer_id, m.organizer_name,
+        m.restaurant_id, FALSE,
+        NULL::int, m.note, m.created_at
+      FROM meetups m
+    )
+    SELECT a.*, r.name AS restaurant_name,
+      r.category AS restaurant_category, r.latitude, r.longitude
+    FROM activity a
+    JOIN restaurants r ON r.id = a.restaurant_id
+    WHERE COALESCE(r.hidden, FALSE) = FALSE
+    ORDER BY a.at DESC
+    LIMIT $1`;
+  const { rows } = await q(sql, [limit]);
+  return rows;
+}
+
 // ─── 점심 모집 ────────────────────────────────────────
 async function createMeetup({ restaurantId, organizerId, organizerName, meetAt, note, channelId }) {
   const { rows } = await q(
@@ -505,6 +539,7 @@ module.exports = {
   listMeetupParticipants,
   closeMeetup,
   listActiveMeetupsByRestaurant,
+  getRecentActivity,
   getUserStats,
   getUserFirstDiscoveries,
   getUserRegulars,

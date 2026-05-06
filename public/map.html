@@ -260,6 +260,7 @@
         <button data-preset="my">👑 내 단골</button>
         <button data-preset="favorite">⭐ 즐겨찾기</button>
         <button data-preset="unvisited">🌫️ 미탐험</button>
+        <button data-preset="activity">🕐 최근 활동</button>
       </div>
       <div class="cat-label">음식 카테고리</div>
       <div id="cats"></div>
@@ -525,6 +526,11 @@ function renderAll() {
     markers.forEach(m => m.setMap(null));
     markers = []; infos = [];
     renderHiddenList();
+    return;
+  }
+  // 최근 활동 피드
+  if (currentPreset === 'activity') {
+    renderActivityList();
     return;
   }
 
@@ -793,6 +799,81 @@ function renderHiddenList() {
     `).join('');
   }
   document.getElementById('stat').textContent = `⛔ 퇴출 ${hiddenRestaurants.length}곳`;
+}
+
+// 최근 활동 피드
+async function renderActivityList() {
+  const labelEl = document.getElementById('section-label');
+  labelEl.textContent = '🕐 최근 활동';
+  labelEl.hidden = false;
+  const list = document.getElementById('list');
+  list.innerHTML = '<div class="empty">불러오는 중…</div>';
+  try {
+    const res = await fetch('/api/activity?limit=30');
+    const items = await res.json();
+    if (!items.length) {
+      list.innerHTML = '<div class="empty">아직 활동이 없어요</div>';
+      return;
+    }
+    list.innerHTML = items.map(a => {
+      const ago = clientTimeAgo(a.at);
+      const userName = esc(a.user_name || a.user_id);
+      const restName = esc(a.restaurant_name);
+      let icon = '🥾', text = '';
+      if (a.kind === 'visit') {
+        if (a.first_discovery) { icon = '🏴'; text = `${userName} <strong>${restName}</strong> 첫 발견!`; }
+        else { icon = '🥾'; text = `${userName}  <strong>${restName}</strong> 체크인`; }
+      } else if (a.kind === 'review') {
+        const stars = '⭐'.repeat(Math.max(0, Math.min(5, a.rating || 0)));
+        const cmt = a.comment ? ` "${esc(a.comment).slice(0, 40)}${a.comment.length > 40 ? '…' : ''}"` : '';
+        icon = '📝'; text = `${userName}  <strong>${restName}</strong> ${stars}${cmt}`;
+      } else if (a.kind === 'meetup') {
+        icon = '🍽️'; text = `${userName}  <strong>${restName}</strong> 점심 모집`;
+      }
+      return `<div class="item activity-item" data-rid="${a.restaurant_id}">
+        <div class="row1">
+          <span class="emoji">${icon}</span>
+          <span class="name" style="font-weight:400">${text}</span>
+        </div>
+        <div class="meta">${ago}</div>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('.activity-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const rid = parseInt(el.dataset.rid, 10);
+        const r = restaurants.find(x => x.id === rid);
+        if (!r) return;
+        // 가까운 순 프리셋으로 돌아가서 해당 식당 InfoWindow 열기
+        currentPreset = 'near';
+        document.querySelectorAll('#presets button').forEach(b =>
+          b.classList.toggle('active', b.dataset.preset === 'near'));
+        renderAll();
+        setTimeout(() => {
+          map.panTo(new kakao.maps.LatLng(r.latitude, r.longitude));
+          reopenById(rid);
+        }, 60);
+      });
+    });
+  } catch (e) {
+    list.innerHTML = '<div class="empty" style="color:#dc2626">불러오기 실패</div>';
+  }
+  document.getElementById('stat').textContent = '🕐 최근 활동';
+  // 지도 마커는 그대로 두되 InfoWindow는 닫음
+  if (openInfo) { openInfo.close(); openInfo = null; clearRoute(); }
+}
+
+function clientTimeAgo(input) {
+  const date = new Date(input);
+  const ms = Date.now() - date.getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return '방금';
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  const days = Math.floor(hr / 24);
+  if (days === 1) return '어제';
+  if (days < 7) return `${days}일 전`;
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
 async function unhideRestaurant(restaurantId, btn) {

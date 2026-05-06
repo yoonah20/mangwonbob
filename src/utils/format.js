@@ -30,10 +30,26 @@ function truncate(text, max = 80) {
   return text.length > max ? text.slice(0, max - 1) + '…' : text;
 }
 
+// 상대 시간 (예: "5분 전", "어제", "3/2")
+function timeAgo(input) {
+  const date = input instanceof Date ? input : new Date(input);
+  const ms = Date.now() - date.getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return '방금';
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  const days = Math.floor(hr / 24);
+  if (days === 1) return '어제';
+  if (days < 7) return `${days}일 전`;
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
 module.exports = {
   distanceToWalk,
   ratingStars,
   progressBar,
   mention,
   truncate,
+  timeAgo,
 };

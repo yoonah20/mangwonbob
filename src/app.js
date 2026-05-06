@@ -303,6 +303,15 @@ expressApp.get('/api/badges', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 최근 활동 피드 (App Home + 지도 사이드바)
+expressApp.get('/api/activity', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+    const list = await db.getRecentActivity(limit);
+    res.json(list);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // 즐겨찾기 토글
 expressApp.post('/api/favorite', expressJson, async (req, res) => {
   try {

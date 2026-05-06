@@ -1,5 +1,24 @@
 // Slack Block Kit 메시지 빌더 — /밥 응답은 지도 진입점 역할만
-const { progressBar, mention } = require('./format');
+const { progressBar, mention, timeAgo, truncate } = require('./format');
+
+function formatActivity(a) {
+  const ago = timeAgo(a.at);
+  const user = mention(a.user_id);
+  const rest = `*${a.restaurant_name}*`;
+  if (a.kind === 'visit') {
+    if (a.first_discovery) return `🏴 ${user} ${rest} 첫 발견! · _${ago}_`;
+    return `🥾 ${user} ${rest} 체크인 · _${ago}_`;
+  }
+  if (a.kind === 'review') {
+    const stars = '⭐'.repeat(Math.max(0, Math.min(5, a.rating || 0)));
+    const cmt = a.comment ? ` "${truncate(a.comment, 50)}"` : '';
+    return `📝 ${user} ${rest} ${stars}${cmt} · _${ago}_`;
+  }
+  if (a.kind === 'meetup') {
+    return `🍽️ ${user} ${rest} 점심 모집 · _${ago}_`;
+  }
+  return '';
+}
 
 function footer() {
   return {
@@ -181,13 +200,12 @@ function meetupAnnounceBlocks({ meetup, restaurant, participants }) {
 }
 
 // App Home — 사이드바에서 망원밥 앱 클릭 시 보이는 화면
-function appHomeView({ teamProgress, mapUrl, userName }) {
+function appHomeView({ teamProgress, mapUrl, userName, activities }) {
   const ratio = teamProgress.total ? teamProgress.discovered / teamProgress.total : 0;
   const blocks = [
     { type: 'header', text: { type: 'plain_text', text: '🍚 망원밥' } },
     { type: 'section', text: { type: 'mrkdwn',
       text: `${userName ? `*${userName}* 님, ` : ''}오늘 뭐 먹지?\n팀 탐험 *${teamProgress.discovered} / ${teamProgress.total}곳*   ${progressBar(ratio)} ${Math.round(ratio * 100)}%` } },
-    { type: 'divider' },
   ];
   if (mapUrl) {
     blocks.push({
@@ -202,6 +220,23 @@ function appHomeView({ teamProgress, mapUrl, userName }) {
     });
   } else {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '_PUBLIC_URL 환경변수를 설정해주세요_' } });
+  }
+  // 최근 활동 피드
+  if (activities && activities.length) {
+    blocks.push({ type: 'divider' });
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: '*🕐 최근 활동*' },
+    });
+    // Slack section의 mrkdwn은 길이 제한이 있어 묶어서 표시
+    const lines = activities.slice(0, 15).map(formatActivity).filter(Boolean);
+    // 5개씩 끊어 section 추가 (3000자 제한 방어)
+    for (let i = 0; i < lines.length; i += 5) {
+      blocks.push({
+        type: 'section',
+        text: { type: 'mrkdwn', text: lines.slice(i, i + 5).join('\n') },
+      });
+    }
   }
   blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '🌿 망원밥 by 몬스테라하우스 · 채팅에서 `/밥` 으로도 사용 가능' }] });
   return { type: 'home', blocks };

@@ -101,7 +101,10 @@ function register(app) {
   app.event('app_home_opened', async ({ event, client }) => {
     if (event.tab !== 'home') return;
     try {
-      const teamProgress = await db.getTeamProgress();
+      const [teamProgress, activities] = await Promise.all([
+        db.getTeamProgress(),
+        db.getRecentActivity(15),
+      ]);
       let userName = '';
       try {
         const info = await client.users.info({ user: event.user });
@@ -112,7 +115,7 @@ function register(app) {
       const mapUrl = buildMapUrl(event.user, userName, process.env.MEETUP_CHANNEL_ID || '');
       await client.views.publish({
         user_id: event.user,
-        view: blocks.appHomeView({ teamProgress, mapUrl, userName }),
+        view: blocks.appHomeView({ teamProgress, mapUrl, userName, activities }),
       });
     } catch (e) {
       console.error('app_home_opened error:', e);
