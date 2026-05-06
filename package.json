@@ -10,10 +10,11 @@
     "init-db": "node scripts/init-db.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": "20.x"
   },
   "dependencies": {
-    "@slack/bolt": "^3.21.0",
+    "@slack/bolt": "^3.22.0",
+    "@slack/socket-mode": "^1.3.5",
     "axios": "^1.7.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

@@ -331,6 +331,18 @@ app.error(async (err) => {
   console.error('Bolt 글로벌 에러:', err);
 });
 
+// Socket Mode 재연결 중 발생하는 finity 상태머신 에러 등 — 크래시 방지
+process.on('uncaughtException', (err) => {
+  if (err && /Unhandled event '.*disconnect.*' in state/.test(String(err.message))) {
+    console.warn('[ignored] Socket Mode 상태머신 일시적 에러:', err.message);
+    return;
+  }
+  console.error('💥 uncaughtException:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('💥 unhandledRejection:', reason);
+});
+
 (async () => {
   await initDb();
   const port = process.env.PORT || 3000;
