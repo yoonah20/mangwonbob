@@ -1258,10 +1258,11 @@ document.querySelectorAll('#stars span').forEach(s => {
   const header = sidebar.querySelector('header');
   const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
 
-  // 탭 토글 (검색창 클릭 제외)
+  // 탭 토글 — 검색창/버튼/칩 영역 클릭은 무시
   header.addEventListener('click', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
-    if (didDrag) return; // 드래그였으면 click 무시
+    if (e.target.closest('#presets, #cats, #search')) return;
+    if (didDrag) return;
     sidebar.classList.toggle('expanded');
   });
 
@@ -1270,7 +1271,8 @@ document.querySelectorAll('#stars span').forEach(s => {
 
   header.addEventListener('touchstart', (e) => {
     if (!isMobile()) return;
-    if (e.target.tagName === 'INPUT') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+    if (e.target.closest('#presets, #cats, #search')) return;
     startY = e.touches[0].clientY;
     dy = 0; dragging = true; didDrag = false;
     sidebar.style.transition = 'none';
