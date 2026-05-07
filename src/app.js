@@ -99,7 +99,7 @@ expressApp.post('/api/meetups', expressJson, async (req, res) => {
         const participants = await db.listMeetupParticipants(meetup.id);
         const result = await app.client.chat.postMessage({
           channel: meetup.channel_id,
-          text: `🍽️ ${restaurant.name} 점심 모집`,
+          text: `🍽️ ${restaurant.name} ${blocks.mealLabel(new Date(meetup.meet_at))} 모집`,
           blocks: blocks.meetupAnnounceBlocks({ meetup, restaurant, participants }),
         });
         if (result.ts) await db.setMeetupMessageTs(meetup.id, result.ts);
@@ -154,7 +154,7 @@ async function refreshMeetupAnnounce(meetupId) {
     await app.client.chat.update({
       channel: meetup.channel_id,
       ts: meetup.message_ts,
-      text: `🍽️ ${restaurant.name} 점심 모집`,
+      text: `🍽️ ${restaurant.name} ${blocks.mealLabel(new Date(meetup.meet_at))} 모집`,
       blocks: blocks.meetupAnnounceBlocks({ meetup, restaurant, participants }),
     });
   } catch (e) {

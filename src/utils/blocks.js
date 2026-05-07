@@ -15,7 +15,8 @@ function formatActivity(a) {
     return `📝 ${user} ${rest} ${stars}${cmt} · _${ago}_`;
   }
   if (a.kind === 'meetup') {
-    return `🍽️ ${user} ${rest} 점심 모집 · _${ago}_`;
+    // 활동 피드는 모집 생성 시점만 알 뿐 실제 시간은 a.at가 아님 — 그대로 표기
+    return `🍽️ ${user} ${rest} 모집 · _${ago}_`;
   }
   return '';
 }
@@ -148,9 +149,15 @@ function firstDiscoveryBlocks(restaurant, userId) {
   ];
 }
 
+// 점심/저녁 자동 판별 (16시 미만 = 점심)
+function mealLabel(date) {
+  return date.getHours() < 16 ? '점심' : '저녁';
+}
+
 // 점심 모집 Slack 메시지
 function meetupAnnounceBlocks({ meetup, restaurant, participants }) {
   const time = new Date(meetup.meet_at);
+  const meal = mealLabel(time);
   const hh = time.getHours();
   const mm = String(time.getMinutes()).padStart(2, '0');
   const today = new Date(); today.setHours(0,0,0,0);
@@ -160,7 +167,7 @@ function meetupAnnounceBlocks({ meetup, restaurant, participants }) {
   const timeStr = `${dayLabel} ${hh}:${mm}`;
 
   const lines = [
-    `🍽️ *점심 모집!*`,
+    `🍽️ *${meal} 모집!*`,
     `${mention(meetup.organizer_id)}님이 *${restaurant.name}* (${restaurant.category}) 갈 사람 모집해요`,
     `📅 ${timeStr}`,
   ];
@@ -248,5 +255,6 @@ module.exports = {
   appHomeView,
   firstDiscoveryBlocks,
   meetupAnnounceBlocks,
+  mealLabel,
   footer,
 };

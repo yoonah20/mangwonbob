@@ -10,7 +10,7 @@ async function refreshAnnounce(client, meetupId) {
   await client.chat.update({
     channel: meetup.channel_id,
     ts: meetup.message_ts,
-    text: `🍽️ ${restaurant.name} 점심 모집`,
+    text: `🍽️ ${restaurant.name} ${blocks.mealLabel(new Date(meetup.meet_at))} 모집`,
     blocks: blocks.meetupAnnounceBlocks({ meetup, restaurant, participants }),
   });
 }
