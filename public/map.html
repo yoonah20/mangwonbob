@@ -611,6 +611,7 @@ function renderAll() {
         const r = filtered[idx];
         map.panTo(new kakao.maps.LatLng(r.latitude, r.longitude));
         openMarker(idx);
+        collapseSidebarOnMobile();
       });
     });
   }
@@ -851,6 +852,7 @@ async function renderActivityList() {
         setTimeout(() => {
           map.panTo(new kakao.maps.LatLng(r.latitude, r.longitude));
           reopenById(rid);
+          collapseSidebarOnMobile();
         }, 60);
       });
     });
@@ -860,6 +862,13 @@ async function renderActivityList() {
   document.getElementById('stat').textContent = '🕐 최근 활동';
   // 지도 마커는 그대로 두되 InfoWindow는 닫음
   if (openInfo) { openInfo.close(); openInfo = null; clearRoute(); }
+}
+
+// 모바일에선 항목 선택 후 사이드바 자동 접힘
+function collapseSidebarOnMobile() {
+  if (window.matchMedia('(max-width: 768px)').matches) {
+    document.getElementById('sidebar').classList.remove('expanded');
+  }
 }
 
 function clientTimeAgo(input) {
