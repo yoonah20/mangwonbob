@@ -1252,17 +1252,54 @@ document.querySelectorAll('#stars span').forEach(s => {
   s.addEventListener('click', () => setStars(parseInt(s.dataset.v, 10)));
 });
 
-// 모바일 — 사이드바 헤더 탭하면 펼침/접힘 토글
-document.querySelector('#sidebar header').addEventListener('click', (e) => {
-  // 검색창 클릭은 제외
-  if (e.target.tagName === 'INPUT') return;
-  document.getElementById('sidebar').classList.toggle('expanded');
-});
+// 모바일 사이드바 — 헤더 탭/드래그로 펼침/접힘
+(function setupSidebarGesture() {
+  const sidebar = document.getElementById('sidebar');
+  const header = sidebar.querySelector('header');
+  const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
 
-// 검색창에 입력하면 자동으로 펼침
-document.getElementById('search').addEventListener('focus', () => {
-  document.getElementById('sidebar').classList.add('expanded');
-});
+  // 탭 토글 (검색창 클릭 제외)
+  header.addEventListener('click', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+    if (didDrag) return; // 드래그였으면 click 무시
+    sidebar.classList.toggle('expanded');
+  });
+
+  // 드래그 — 위로 끌면 펼침, 아래로 끌면 접힘
+  let startY = 0, dy = 0, dragging = false, didDrag = false;
+
+  header.addEventListener('touchstart', (e) => {
+    if (!isMobile()) return;
+    if (e.target.tagName === 'INPUT') return;
+    startY = e.touches[0].clientY;
+    dy = 0; dragging = true; didDrag = false;
+    sidebar.style.transition = 'none';
+  }, { passive: true });
+
+  header.addEventListener('touchmove', (e) => {
+    if (!dragging) return;
+    dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > 4) didDrag = true;
+    const expanded = sidebar.classList.contains('expanded');
+    const collapsedY = Math.max(0, sidebar.offsetHeight - 92);
+    let translateY = expanded ? Math.max(0, dy) : Math.max(0, Math.min(collapsedY, collapsedY + dy));
+    sidebar.style.transform = `translateY(${translateY}px)`;
+  }, { passive: true });
+
+  header.addEventListener('touchend', () => {
+    if (!dragging) return;
+    dragging = false;
+    sidebar.style.transition = '';
+    if (dy < -40) sidebar.classList.add('expanded');
+    else if (dy > 40) sidebar.classList.remove('expanded');
+    sidebar.style.transform = '';
+  });
+
+  // 검색창에 입력하면 자동으로 펼침
+  document.getElementById('search').addEventListener('focus', () => {
+    sidebar.classList.add('expanded');
+  });
+})();
 
 async function submitReview() {
   if (!reviewRating) return alert('별점을 선택해주세요');
