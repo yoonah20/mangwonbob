@@ -243,11 +243,11 @@
   <aside id="sidebar">
     <header>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <h1 style="margin:0">🍚 망원밥 탐험 지도</h1>
-        <div style="display:flex;gap:6px;flex:0 0 auto">
-          <button id="collectBtn" onclick="bulkCollect()" title="카카오에서 회사 주변 식당을 한꺼번에 수집"
-            style="padding:6px 10px;font-size:13px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;flex:0 0 auto">
-            🔄 대량 수집
+        <h1 style="margin:0">🍚 망원밥</h1>
+        <div style="display:flex;gap:6px;flex:0 0 auto;align-items:center">
+          <button id="collectBtn" onclick="bulkCollect()" title="대량 수집 — 카카오에서 회사 주변 식당을 한꺼번에 수집"
+            style="width:30px;height:30px;padding:0;font-size:14px;line-height:1;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;flex:0 0 auto">
+            🔄
           </button>
           <button id="addBtn" onclick="openAddModal()" title="식당 추가"
             style="padding:6px 10px;font-size:13px;background:#10b981;color:#fff;border:none;border-radius:6px;cursor:pointer;flex:0 0 auto">
@@ -935,16 +935,21 @@ async function bulkCollect() {
   if (!confirm('카카오에서 회사 주변 식당을 한꺼번에 수집합니다.\n30초~1분 정도 걸릴 수 있어요. 진행할까요?')) return;
 
   const label = btn.textContent;
+  const title = btn.title;
   btn.disabled = true;
   btn.style.cursor = 'progress';
-  btn.textContent = '⏳ 수집 중…';
+  btn.textContent = '⏳';
   try {
     const res = await fetch('/api/collect', { method: 'POST' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '수집 실패');
     await loadRestaurants();
-    btn.textContent = data.added > 0 ? `✅ 신규 ${data.added}곳` : '✅ 최신 상태';
-    setTimeout(() => { btn.textContent = label; btn.disabled = false; btn.style.cursor = 'pointer'; }, 4000);
+    btn.textContent = '✅';
+    btn.title = data.added > 0 ? `신규 ${data.added}곳 추가됨` : '이미 최신 상태';
+    setTimeout(() => {
+      btn.textContent = label; btn.title = title;
+      btn.disabled = false; btn.style.cursor = 'pointer';
+    }, 3000);
   } catch (e) {
     btn.textContent = label;
     btn.disabled = false;
