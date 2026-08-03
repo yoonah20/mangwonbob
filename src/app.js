@@ -404,18 +404,34 @@ process.on('unhandledRejection', (reason) => {
 });
 
 (async () => {
-  await initDb();
   const port = process.env.PORT || 3000;
+
+  // Socket Mode에서는 웹서버(헬스체크·지도·API)를 Slack/DB와 독립적으로 먼저 띄운다.
+  // 이렇게 해야 DB 초기화나 Slack 연결이 실패해도 지도/헬스체크는 계속 살아있고,
+  // 진짜 원인이 아래 로그로 드러난다. (기존엔 앞 단계가 막히면 웹서버까지 안 떠서 주소 자체가 안 열렸음)
   if (useSocketMode) {
-    await app.start();
-    // Socket Mode에서는 Bolt가 포트를 점유하지 않으므로 Express를 별도로 listen
-    expressApp.listen(port, () => {
-      console.log(`🌐 헬스체크 서버 listening on ${port}`);
-    });
-  } else {
-    await app.start(port);
+    expressApp.listen(port, () => console.log(`🌐 웹 서버 listening on ${port}`));
   }
-  console.log(`⚡️ 망원밥 봇 실행 중 (port: ${port}, mode: ${useSocketMode ? 'socket' : 'http'})`);
+
+  // DB 스키마 적용 — 실패해도 프로세스는 유지
+  try {
+    await initDb();
+  } catch (e) {
+    console.error('💥 DB 초기화 실패 — 웹 서버는 계속 동작합니다:', e.message);
+  }
+
+  // Slack 앱 시작 — 실패해도 웹 서버는 유지
+  try {
+    if (useSocketMode) {
+      await app.start();
+    } else {
+      // HTTP 모드: Bolt(ExpressReceiver)가 포트를 점유하며 웹서버 역할도 겸함
+      await app.start(port);
+    }
+    console.log(`⚡️ 망원밥 봇 실행 중 (port: ${port}, mode: ${useSocketMode ? 'socket' : 'http'})`);
+  } catch (e) {
+    console.error('💥 Slack 앱 시작 실패 — 웹 서버는 계속 동작합니다:', e.message);
+  }
 
   // 월 1회 자동 식당 수집 — 완료 시 신규 식당이 있으면 채널에 공지
   scheduler.startMonthlyCollect(async (err, result) => {
