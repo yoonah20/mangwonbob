@@ -372,7 +372,7 @@ expressApp.post('/api/favorite', expressJson, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 위시리스트 토글
+// 가고픈 곳 토글
 expressApp.post('/api/wishlist', expressJson, async (req, res) => {
   try {
     const { restaurantId, userId } = req.body;

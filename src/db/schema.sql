@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS favorites (
 );
 CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(slack_user_id);
 
--- 위시리스트 (가보고 싶은 곳 하트)
+-- 가고픈 곳 (하트)
 CREATE TABLE IF NOT EXISTS wishlist (
   id SERIAL PRIMARY KEY,
   slack_user_id VARCHAR NOT NULL,

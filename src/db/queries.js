@@ -467,6 +467,7 @@ async function listAllRestaurantsWithStatus(userId = null) {
        (SELECT ROUND(AVG(rating)::numeric, 1) FROM reviews WHERE restaurant_id = r.id) AS avg_rating,
        (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id)::int AS visit_count,
        (SELECT COUNT(*) FROM reviews WHERE restaurant_id = r.id)::int AS review_count,
+       (SELECT COUNT(*) FROM wishlist WHERE restaurant_id = r.id)::int AS wish_count,
        (SELECT json_build_object('rating', rating, 'comment', comment, 'tags', tags,
          'user_name', slack_user_name)
         FROM reviews
@@ -514,7 +515,7 @@ async function toggleFavorite(userId, restaurantId) {
   return { favorited: true };
 }
 
-// 위시리스트 (가보고 싶은 곳)
+// 가고픈 곳 (가보고 싶은 곳)
 async function toggleWishlist(userId, restaurantId) {
   const { rows } = await q(
     `SELECT id FROM wishlist WHERE slack_user_id = $1 AND restaurant_id = $2`,
