@@ -136,17 +136,41 @@ function pickedBlocks({ category, recommendations, mapUrl }) {
 }
 
 // 첫 발견 채널 공지 (지도 체크인 시)
-function firstDiscoveryBlocks(restaurant, userId) {
-  return [
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `🎉 *새로운 식당이 발견됐어요!*\n${mention(userId)} 님이 *"${restaurant.name}"* 을(를) 처음 발견했습니다!\n📍 ${restaurant.category}`,
-      },
-    },
-    footer(),
+// review가 있으면 별점/코멘트/태그까지, mapUrl이 있으면 지도 이동 버튼까지 함께 노출.
+function firstDiscoveryBlocks({ restaurant, userId, mapUrl, review }) {
+  const lines = [
+    `🎉 *새로운 식당이 발견됐어요!*`,
+    `${mention(userId)} 님이 *"${restaurant.name}"* 을(를) 처음 발견했습니다!`,
+    `📍 ${restaurant.category}`,
   ];
+
+  if (review && review.rating) {
+    const r = Math.max(0, Math.min(5, review.rating));
+    const stars = '⭐'.repeat(r) + '☆'.repeat(5 - r);
+    lines.push(`\n${stars}  *${Number(review.rating).toFixed(1)}*`);
+    if (review.comment) lines.push(`💬 _"${truncate(review.comment, 120)}"_`);
+    if (review.tags && review.tags.length) {
+      lines.push(review.tags.map(t => `\`${t}\``).join(' '));
+    }
+  }
+
+  const out = [
+    { type: 'section', text: { type: 'mrkdwn', text: lines.join('\n') } },
+  ];
+  if (mapUrl) {
+    out.push({
+      type: 'actions',
+      elements: [{
+        type: 'button',
+        text: { type: 'plain_text', text: '🗺️ 앱에서 보기', emoji: true },
+        url: mapUrl,
+        action_id: 'open_map_view',
+        style: 'primary',
+      }],
+    });
+  }
+  out.push(footer());
+  return out;
 }
 
 // 점심/저녁 자동 판별 (16시 미만 = 점심)

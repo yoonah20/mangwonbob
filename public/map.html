@@ -414,6 +414,10 @@ if (typeof kakao === 'undefined') {
 
     await loadRestaurants();
     document.getElementById('search').addEventListener('input', renderAll);
+
+    // ?focus=<id> 로 진입하면 해당 식당을 자동으로 열어줌 (슬랙 알림의 "앱에서 보기" 링크)
+    const focusId = parseInt(params.get('focus'), 10);
+    if (focusId) setTimeout(() => reopenById(focusId), 300);
   });
 }
 

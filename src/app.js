@@ -15,9 +15,14 @@ const kakaoSvc = require('./services/kakao');
 const collectSvc = require('./services/collect');
 const scheduler = require('./services/scheduler');
 const blocks = require('./utils/blocks');
+const { buildMapUrl } = require('./utils/format');
 
 // JSON 바디 파싱 (지도 뷰 API용)
 const expressJson = express.json();
+
+// 첫 발견 공지 메시지 추적 — 발견자가 이어서 리뷰를 남기면 그 메시지를
+// 별점/코멘트까지 포함해 갱신한다. key: `${restaurantId}:${userId}` → { channel, ts }
+const discoveryMsgs = new Map();
 
 // 앱 시작 시 스키마 자동 적용 (IF NOT EXISTS라 멱등)
 async function initDb() {
@@ -195,11 +200,16 @@ expressApp.post('/api/visit', expressJson, async (req, res) => {
     if (result.isFirstDiscoverer && channelId) {
       try {
         const restaurant = await db.getRestaurantById(restaurantId);
-        await app.client.chat.postMessage({
+        const mapUrl = buildMapUrl(userId, userName, channelId, restaurantId);
+        const posted = await app.client.chat.postMessage({
           channel: channelId,
           text: `🎉 ${restaurant.name} 첫 발견!`,
-          blocks: blocks.firstDiscoveryBlocks(restaurant, userId),
+          blocks: blocks.firstDiscoveryBlocks({ restaurant, userId, mapUrl }),
         });
+        // 뒤이어 발견자가 리뷰를 남기면 이 메시지를 갱신하기 위해 ts 보관
+        if (posted && posted.ts) {
+          discoveryMsgs.set(`${restaurantId}:${userId}`, { channel: channelId, ts: posted.ts });
+        }
       } catch (e) {
         console.error('첫 발견 공지 실패:', e.message);
       }
@@ -233,6 +243,26 @@ expressApp.post('/api/review', expressJson, async (req, res) => {
       restaurantId, userId, userName: userName || userId,
       rating: parseInt(rating, 10), comment, tags: tags || [],
     });
+
+    // 이 리뷰어가 첫 발견자라면(= 방금 올린 발견 공지가 있으면) 그 공지를
+    // 별점/코멘트까지 포함해 갱신한다.
+    const key = `${restaurantId}:${userId}`;
+    const pending = discoveryMsgs.get(key);
+    if (pending) {
+      try {
+        const restaurant = await db.getRestaurantById(restaurantId);
+        const mapUrl = buildMapUrl(userId, userName, pending.channel, restaurantId);
+        await app.client.chat.update({
+          channel: pending.channel,
+          ts: pending.ts,
+          text: `🎉 ${restaurant.name} 첫 발견!`,
+          blocks: blocks.firstDiscoveryBlocks({ restaurant, userId, mapUrl, review }),
+        });
+      } catch (e) {
+        console.error('첫 발견 공지 갱신 실패:', e.message);
+      }
+    }
+
     res.json(review);
   } catch (e) {
     res.status(500).json({ error: e.message });

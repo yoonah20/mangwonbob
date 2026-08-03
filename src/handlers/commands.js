@@ -3,17 +3,7 @@ const db = require('../db/queries');
 const restaurantSvc = require('../services/restaurant');
 const deepseek = require('../services/deepseek');
 const blocks = require('../utils/blocks');
-
-function buildMapUrl(userId, userName, channelId) {
-  if (!process.env.PUBLIC_URL) return null;
-  const base = process.env.PUBLIC_URL.replace(/\/$/, '');
-  const params = new URLSearchParams({
-    user: userId || '',
-    name: userName || '',
-    channel: channelId || '',
-  });
-  return `${base}/map?${params.toString()}`;
-}
+const { buildMapUrl } = require('../utils/format');
 
 async function getPicksForCategory(category, limit = 3) {
   if (category === '_unvisited') return restaurantSvc.getUnvisitedPicks(limit);

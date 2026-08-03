@@ -24,6 +24,20 @@ function mention(userId) {
   return `<@${userId}>`;
 }
 
+// 지도 뷰 진입 URL — PUBLIC_URL 미설정 시 null
+// focusId를 주면 지도 로드 후 해당 식당을 자동으로 열어줌
+function buildMapUrl(userId, userName, channelId, focusId) {
+  if (!process.env.PUBLIC_URL) return null;
+  const base = process.env.PUBLIC_URL.replace(/\/$/, '');
+  const params = new URLSearchParams({
+    user: userId || '',
+    name: userName || '',
+    channel: channelId || '',
+  });
+  if (focusId) params.set('focus', String(focusId));
+  return `${base}/map?${params.toString()}`;
+}
+
 // 안전한 텍스트 자르기
 function truncate(text, max = 80) {
   if (!text) return '';
@@ -50,6 +64,7 @@ module.exports = {
   ratingStars,
   progressBar,
   mention,
+  buildMapUrl,
   truncate,
   timeAgo,
 };
