@@ -12,6 +12,8 @@ const meetups = require('./handlers/meetups');
 const reviewSvc = require('./services/review');
 const badgesSvc = require('./services/badges');
 const kakaoSvc = require('./services/kakao');
+const collectSvc = require('./services/collect');
+const scheduler = require('./services/scheduler');
 const blocks = require('./utils/blocks');
 
 // JSON 바디 파싱 (지도 뷰 API용)
@@ -293,6 +295,24 @@ expressApp.post('/api/restaurants', expressJson, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 대량 수집 — 카카오에서 회사 주변 식당을 한꺼번에 긁어와 upsert (지도의 "대량 수집" 버튼용)
+expressApp.post('/api/collect', async (_req, res) => {
+  if (collectSvc.isRunning()) {
+    return res.status(409).json({ error: '이미 수집이 진행 중입니다.', running: true });
+  }
+  try {
+    const result = await collectSvc.collectRestaurants({ log: (m) => console.log('[대량수집]', m) });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 수집 진행 상태 / 마지막 수집 결과
+expressApp.get('/api/collect/status', (_req, res) => {
+  res.json({ running: collectSvc.isRunning(), last: collectSvc.getLastResult() });
+});
+
 // 사용자 뱃지 (지도 사이드바용)
 expressApp.get('/api/badges', async (req, res) => {
   try {
@@ -356,4 +376,19 @@ process.on('unhandledRejection', (reason) => {
     await app.start(port);
   }
   console.log(`⚡️ 망원밥 봇 실행 중 (port: ${port}, mode: ${useSocketMode ? 'socket' : 'http'})`);
+
+  // 월 1회 자동 식당 수집 — 완료 시 신규 식당이 있으면 채널에 공지
+  scheduler.startMonthlyCollect(async (err, result) => {
+    if (err || !result) return;
+    const channel = process.env.MEETUP_CHANNEL_ID;
+    if (!channel || result.added <= 0) return;
+    try {
+      await app.client.chat.postMessage({
+        channel,
+        text: `🗺️ 이번 달 망원동 탐험 지도가 업데이트됐어요! 새로 발견된 식당 *${result.added}곳*. \`/밥\` 으로 확인해 보세요 🍚`,
+      });
+    } catch (e) {
+      console.error('월간 수집 공지 실패:', e.message);
+    }
+  });
 })();

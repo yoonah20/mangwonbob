@@ -39,6 +39,12 @@ async function upsertRestaurant(r) {
   return rows[0];
 }
 
+// 전체 식당 수 (숨김 포함) — 수집 전후 신규 식당 수 계산용
+async function countRestaurants() {
+  const { rows } = await q(`SELECT COUNT(*)::int AS c FROM restaurants`);
+  return rows[0].c;
+}
+
 async function findRestaurantByName(name) {
   const { rows } = await q(
     `SELECT * FROM restaurants WHERE name ILIKE $1 ORDER BY distance_from_office ASC LIMIT 1`,
@@ -511,6 +517,7 @@ module.exports = {
   pool,
   q,
   upsertRestaurant,
+  countRestaurants,
   findRestaurantByName,
   searchRestaurantsByName,
   getRestaurantById,

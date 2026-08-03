@@ -1,7 +1,8 @@
-// 카카오 로컬 API로 회사 반경 1km 내 음식점 수집 → DB 저장
+// 카카오 로컬 API로 회사 주변 음식점 수집 → DB 저장 (CLI)
+// 실제 수집 로직은 src/services/collect.js 에 공용화돼 있다.
 require('dotenv').config();
 
-const kakao = require('../src/services/kakao');
+const { collectRestaurants } = require('../src/services/collect');
 const db = require('../src/db/queries');
 
 async function main() {
@@ -14,41 +15,8 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('🔍 카카오 로컬 API로 망원동 식당 수집 중...');
-
-  // 수집 중심점들 — 회사 + 망원파출소
-  const centers = [kakao.OFFICE];
-  const police = await kakao.findLocationByKeyword('망원파출소');
-  if (police) {
-    console.log(`📍 망원파출소: ${police.name} (${police.address})`);
-    centers.push({ x: police.x, y: police.y });
-  } else {
-    console.log('⚠️ 망원파출소를 찾지 못했습니다. 회사 기준으로만 수집');
-  }
-
-  const docs = await kakao.collectAllRestaurants(500, centers);
-  console.log(`📦 ${docs.length}개 식당 수신 (중심점 ${centers.length}개, 각 500m 반경)`);
-
-  // kakao_place_id 기준 중복 제거
-  const seen = new Set();
-  const unique = docs.filter(d => {
-    if (seen.has(d.id)) return false;
-    seen.add(d.id);
-    return true;
-  });
-  console.log(`✨ 중복 제거 후 ${unique.length}개`);
-
-  let inserted = 0;
-  for (const doc of unique) {
-    const restaurant = kakao.mapKakaoToRestaurant(doc);
-    try {
-      await db.upsertRestaurant(restaurant);
-      inserted += 1;
-    } catch (e) {
-      console.error(`⚠️ ${restaurant.name} 저장 실패:`, e.message);
-    }
-  }
-  console.log(`✅ ${inserted}개 식당이 DB에 저장됐습니다.`);
+  const result = await collectRestaurants({ log: (m) => console.log(m) });
+  console.log(`🎉 완료 — 수신 ${result.received} / 저장 ${result.upserted} / 신규 ${result.added}`);
   await db.pool.end();
 }
 
