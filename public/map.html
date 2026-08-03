@@ -264,7 +264,6 @@
         <button data-preset="popular">🔥 인기</button>
         <button data-preset="my">👑 단골</button>
         <button data-preset="wishlist">🤍 가고픈 곳</button>
-        <button data-preset="wishpop">💗 다들 가고픈</button>
         <button data-preset="unvisited">🌫️ 미탐험</button>
         <button data-preset="activity" title="최근 활동" style="margin-left:auto">🕐</button>
       </div>
@@ -506,11 +505,6 @@ function applyPreset(list, preset) {
       return list
         .filter(r => r.is_wishlisted || r.is_favorite)
         .sort((a, b) => (a.distance_from_office || 0) - (b.distance_from_office || 0));
-    case 'wishpop':
-      return list
-        .filter(r => (r.wish_count || 0) > 0)
-        .sort((a, b) => (b.wish_count || 0) - (a.wish_count || 0)
-          || (a.distance_from_office || 0) - (b.distance_from_office || 0));
     case 'myreviews':
       return list
         .filter(r => r.my_review)
@@ -533,7 +527,6 @@ const PRESET_LABEL = {
   popular: '🔥 자주 가고 평점 좋은 곳',
   my: '👑 내가 자주 가는 단골',
   wishlist: '🤍 내 가고픈 곳',
-  wishpop: '💗 다들 가고파하는 곳',
   myreviews: '📝 내가 쓴 리뷰',
   unvisited: '🌫️ 아직 안 가본 곳',
   hidden: '⛔ 퇴출된 식당 (복구 가능)',
@@ -597,7 +590,6 @@ function renderAll() {
   if (!filtered.length) {
     const msg = currentPreset === 'my' ? '아직 단골이 없어요' :
                 currentPreset === 'wishlist' ? '가고픈 곳이 비어 있어요. 🤍 하트를 눌러 담아보세요' :
-                currentPreset === 'wishpop' ? '아직 아무도 가고픈 곳을 안 담았어요' :
                 currentPreset === 'myreviews' ? '아직 작성한 리뷰가 없어요' :
                 currentPreset === 'unvisited' ? '모든 곳을 탐험했네요! 🎉' :
                 currentPreset === 'popular' ? '아직 방문·리뷰 기록이 없어요' :
