@@ -80,6 +80,16 @@ CREATE TABLE IF NOT EXISTS favorites (
 );
 CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(slack_user_id);
 
+-- 위시리스트 (가보고 싶은 곳 하트)
+CREATE TABLE IF NOT EXISTS wishlist (
+  id SERIAL PRIMARY KEY,
+  slack_user_id VARCHAR NOT NULL,
+  restaurant_id INTEGER REFERENCES restaurants(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(slack_user_id, restaurant_id)
+);
+CREATE INDEX IF NOT EXISTS idx_wishlist_user ON wishlist(slack_user_id);
+
 CREATE TABLE IF NOT EXISTS meetup_participants (
   id SERIAL PRIMARY KEY,
   meetup_id INTEGER REFERENCES meetups(id) ON DELETE CASCADE,

@@ -455,9 +455,10 @@ async function listAllRestaurantsWithStatus(userId = null) {
        EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id AND v.slack_user_id = $1) AS visited_by_me,
        (SELECT COUNT(*) FROM visits WHERE restaurant_id = r.id AND slack_user_id = $1)::int AS my_visit_count,
        EXISTS (SELECT 1 FROM favorites f WHERE f.restaurant_id = r.id AND f.slack_user_id = $1) AS is_favorite,
+       EXISTS (SELECT 1 FROM wishlist w WHERE w.restaurant_id = r.id AND w.slack_user_id = $1) AS is_wishlisted,
        (SELECT json_build_object('rating', rating, 'comment', comment, 'tags', tags, 'created_at', created_at)
         FROM reviews WHERE restaurant_id = r.id AND slack_user_id = $1 LIMIT 1) AS my_review`
-    : `, FALSE AS visited_by_me, 0 AS my_visit_count, FALSE AS is_favorite, NULL AS my_review`;
+    : `, FALSE AS visited_by_me, 0 AS my_visit_count, FALSE AS is_favorite, FALSE AS is_wishlisted, NULL AS my_review`;
   const sampleReviewWhere = userId
     ? `AND comment IS NOT NULL AND comment != '' AND slack_user_id != $1`
     : `AND comment IS NOT NULL AND comment != ''`;
@@ -513,6 +514,23 @@ async function toggleFavorite(userId, restaurantId) {
   return { favorited: true };
 }
 
+// 위시리스트 (가보고 싶은 곳)
+async function toggleWishlist(userId, restaurantId) {
+  const { rows } = await q(
+    `SELECT id FROM wishlist WHERE slack_user_id = $1 AND restaurant_id = $2`,
+    [userId, restaurantId]
+  );
+  if (rows.length) {
+    await q(`DELETE FROM wishlist WHERE id = $1`, [rows[0].id]);
+    return { wishlisted: false };
+  }
+  await q(
+    `INSERT INTO wishlist (slack_user_id, restaurant_id) VALUES ($1, $2)`,
+    [userId, restaurantId]
+  );
+  return { wishlisted: true };
+}
+
 module.exports = {
   pool,
   q,
@@ -530,6 +548,7 @@ module.exports = {
   unhideRestaurant,
   listHiddenRestaurants,
   toggleFavorite,
+  toggleWishlist,
   addVisit,
   userHasVisited,
   cancelLatestVisit,

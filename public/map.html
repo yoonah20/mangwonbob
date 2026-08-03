@@ -265,6 +265,7 @@
         <button data-preset="rating">⭐ 평점</button>
         <button data-preset="my">👑 내 단골</button>
         <button data-preset="favorite">⭐ 즐겨찾기</button>
+        <button data-preset="wishlist">🤍 위시리스트</button>
         <button data-preset="unvisited">🌫️ 미탐험</button>
         <button data-preset="activity">🕐 최근 활동</button>
       </div>
@@ -506,6 +507,10 @@ function applyPreset(list, preset) {
       return list
         .filter(r => r.is_favorite)
         .sort((a, b) => (a.distance_from_office || 0) - (b.distance_from_office || 0));
+    case 'wishlist':
+      return list
+        .filter(r => r.is_wishlisted)
+        .sort((a, b) => (a.distance_from_office || 0) - (b.distance_from_office || 0));
     case 'myreviews':
       return list
         .filter(r => r.my_review)
@@ -529,6 +534,7 @@ const PRESET_LABEL = {
   rating: '⭐ 평점이 높은 곳',
   my: '👑 내가 자주 가는 단골',
   favorite: '⭐ 내 즐겨찾기',
+  wishlist: '🤍 내 위시리스트',
   myreviews: '📝 내가 쓴 리뷰',
   unvisited: '🌫️ 아직 안 가본 곳',
   hidden: '⛔ 퇴출된 식당 (복구 가능)',
@@ -592,6 +598,7 @@ function renderAll() {
   if (!filtered.length) {
     const msg = currentPreset === 'my' ? '아직 단골이 없어요' :
                 currentPreset === 'favorite' ? '즐겨찾기한 식당이 없어요. ☆ 별을 눌러 추가하세요' :
+                currentPreset === 'wishlist' ? '위시리스트가 비어 있어요. 🤍 하트를 눌러 담아보세요' :
                 currentPreset === 'myreviews' ? '아직 작성한 리뷰가 없어요' :
                 currentPreset === 'unvisited' ? '모든 곳을 탐험했네요! 🎉' :
                 currentPreset === 'rating' ? '아직 리뷰가 없어요' :
@@ -690,6 +697,13 @@ function buildInfoContent(r) {
          title="${r.is_favorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}">${r.is_favorite ? '⭐' : '☆'}</span>`
     : '';
 
+  // 위시리스트 하트
+  const wishHeart = canAct
+    ? `<span style="cursor:pointer;font-size:18px;margin-left:2px"
+         onclick="toggleWishlist(${r.id}, this)"
+         title="${r.is_wishlisted ? '위시리스트에서 빼기' : '위시리스트에 담기'}">${r.is_wishlisted ? '❤️' : '🤍'}</span>`
+    : '';
+
   // 내 리뷰 (있으면 표시)
   const myReviewLine = r.my_review
     ? `<div class="review-quote" style="background:#eef2ff;border-left-color:#6366f1">
@@ -768,7 +782,7 @@ function buildInfoContent(r) {
     : '';
 
   return `<div class="iw">
-    <div class="title">${categoryEmoji(r.category)} ${esc(r.name)}${badges}${favStar}${hideTinyBtn}</div>
+    <div class="title">${categoryEmoji(r.category)} ${esc(r.name)}${badges}${favStar}${wishHeart}${hideTinyBtn}</div>
     <div class="meta">${esc(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
     <div class="meta">${ratingLine}</div>
     ${meLine}
@@ -918,6 +932,22 @@ async function toggleFavorite(restaurantId, btn) {
   btn.disabled = true;
   try {
     const res = await fetch('/api/favorite', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ restaurantId, userId: USER.id }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || '실패');
+    const id = window._lastRestaurantId;
+    await loadRestaurants();
+    if (id) reopenById(id);
+  } catch (e) { btn.disabled = false; alert('실패: ' + e.message); }
+}
+
+// 위시리스트 토글
+async function toggleWishlist(restaurantId, btn) {
+  if (!USER.id) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/wishlist', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ restaurantId, userId: USER.id }),
     });

@@ -372,6 +372,16 @@ expressApp.post('/api/favorite', expressJson, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 위시리스트 토글
+expressApp.post('/api/wishlist', expressJson, async (req, res) => {
+  try {
+    const { restaurantId, userId } = req.body;
+    if (!restaurantId || !userId) return res.status(400).json({ error: 'missing params' });
+    const result = await db.toggleWishlist(userId, restaurantId);
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // 핸들러 등록
 commands.register(app);
 meetups.register(app);
