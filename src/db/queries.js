@@ -2,14 +2,19 @@
 const { Pool } = require('pg');
 const { bucketPattern } = require('../utils/category');
 
-// 카테고리 필터 SQL 조각 — 버킷 키면 category_detail 정규식, 아니면 coarse ILIKE 폴백.
+// 카테고리 필터 SQL 조각 — 수동 지정(category_override)이 있으면 그걸 우선,
+// 없으면 category_detail 정규식(버킷) 또는 coarse ILIKE 폴백.
 // where/params를 직접 갱신하고, 붙일 조건 문자열을 반환한다.
 function categoryFilter(category, params) {
   const pat = bucketPattern(category);
   if (pat) {
+    params.push(category);
+    const kIdx = params.length;
     params.push(pat);
-    // 상세 경로 우선, 없으면 coarse category 로 매칭
-    return ` AND COALESCE(r.category_detail, r.category) ~ $${params.length}`;
+    const pIdx = params.length;
+    // override가 이 버킷이거나, override 없이 자동분류가 이 버킷이면 매칭
+    return ` AND (r.category_override = $${kIdx}
+      OR (r.category_override IS NULL AND COALESCE(r.category_detail, r.category) ~ $${pIdx}))`;
   }
   params.push(`%${category}%`);
   return ` AND r.category ILIKE $${params.length}`;
@@ -493,6 +498,11 @@ async function listAllRestaurantsWithStatus(userId = null) {
   return rows;
 }
 
+// 카테고리 수동 지정 (bucket이 null/빈값이면 자동분류로 되돌림)
+async function setCategoryOverride(id, bucket) {
+  await q(`UPDATE restaurants SET category_override = $1 WHERE id = $2`, [bucket || null, id]);
+}
+
 // 식당 숨김 처리
 async function hideRestaurant(id) {
   await q(`UPDATE restaurants SET hidden = TRUE WHERE id = $1`, [id]);
@@ -557,6 +567,7 @@ module.exports = {
   listUnknownRestaurants,
   listRecommendedRestaurants,
   listAllRestaurantsWithStatus,
+  setCategoryOverride,
   hideRestaurant,
   unhideRestaurant,
   listHiddenRestaurants,

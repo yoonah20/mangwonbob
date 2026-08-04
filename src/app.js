@@ -16,6 +16,7 @@ const collectSvc = require('./services/collect');
 const scheduler = require('./services/scheduler');
 const blocks = require('./utils/blocks');
 const { buildMapUrl } = require('./utils/format');
+const { BUCKET_NAMES } = require('./utils/category');
 
 // JSON 바디 파싱 (지도 뷰 API용)
 const expressJson = express.json();
@@ -369,6 +370,18 @@ expressApp.post('/api/favorite', expressJson, async (req, res) => {
     if (!restaurantId || !userId) return res.status(400).json({ error: 'missing params' });
     const result = await db.toggleFavorite(userId, restaurantId);
     res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 카테고리 수동 변경 (bucket 빈값이면 자동분류로 되돌림)
+expressApp.post('/api/category', expressJson, async (req, res) => {
+  try {
+    const { restaurantId, userId, bucket } = req.body;
+    if (!restaurantId || !userId) return res.status(400).json({ error: 'missing params' });
+    const val = bucket || null;
+    if (val && !BUCKET_NAMES.includes(val)) return res.status(400).json({ error: '알 수 없는 카테고리' });
+    await db.setCategoryOverride(restaurantId, val);
+    res.json({ ok: true, category_override: val });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

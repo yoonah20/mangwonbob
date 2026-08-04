@@ -18,9 +18,12 @@ const BUCKETS = [
 
 const PATTERN_BY_BUCKET = Object.fromEntries(BUCKETS);
 
+// 유효한 버킷 이름 목록 (수동 지정 검증용) — 자동 버킷 + '기타'
+const BUCKET_NAMES = BUCKETS.map(b => b[0]).concat('기타');
+
 // 버킷 키('빵집' 등)에 해당하는 정규식 소스. 알려진 버킷이 아니면 null.
 function bucketPattern(key) {
   return PATTERN_BY_BUCKET[key] || null;
 }
 
-module.exports = { BUCKETS, bucketPattern };
+module.exports = { BUCKETS, BUCKET_NAMES, bucketPattern };

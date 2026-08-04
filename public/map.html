@@ -82,6 +82,9 @@
   .iw { padding: 12px 12px 24px; font-size: 13px; min-width: 220px; max-width: 300px; line-height: 1.5; word-break: keep-all; }
   .iw .title { font-weight: 600; font-size: 14px; line-height: 1.35; }
   .iw .meta { color: #666; font-size: 12px; }
+  .iw .cat-edit { font-size: 12px; color: #666; margin: 2px 0; }
+  .iw .cat-edit select { font-size: 12px; padding: 1px 4px; border: 1px solid #ddd;
+    border-radius: 5px; background: #fff; color: #333; max-width: 150px; }
   .iw .badge { display: inline-block; padding: 1px 6px; margin-left: 4px; border-radius: 4px;
     font-size: 10px; font-weight: 600; vertical-align: middle; }
   .iw .badge.hot { background: #fee2e2; color: #dc2626; }
@@ -473,11 +476,15 @@ const BUCKET_EMOJI = {
 // 식당의 버킷팅용 카테고리 (상세 경로 우선, 없으면 coarse)
 function catOf(r) { return (r && (r.category_detail || r.category)) || ''; }
 
+// 식당의 최종 카테고리 버킷 — 수동 지정(category_override)이 있으면 그게 우선
+function bucketOf(r) { return (r && r.category_override) || categoryBucket(catOf(r)); }
+function emojiOf(r) { return BUCKET_EMOJI[bucketOf(r)] || '🍴'; }
+
 // 카테고리 칩 동적 생성 (식당 수 많은 순)
 function renderCatChips() {
   const counts = {};
   restaurants.forEach(r => {
-    const b = categoryBucket(catOf(r));
+    const b = bucketOf(r);
     counts[b] = (counts[b] || 0) + 1;
   });
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
@@ -557,7 +564,7 @@ function renderAll() {
   const q = (document.getElementById('search').value || '').toLowerCase();
   let filtered = restaurants.filter(r => {
     if (q && !r.name.toLowerCase().includes(q) && !(r.category || '').toLowerCase().includes(q)) return false;
-    if (currentCat && categoryBucket(catOf(r)) !== currentCat) return false;
+    if (currentCat && bucketOf(r) !== currentCat) return false;
     return true;
   });
   filtered = applyPreset(filtered, currentPreset);
@@ -616,7 +623,7 @@ function renderAll() {
         : `<span class="status unk">🌫️ 미탐험</span>`;
       return `<div class="item" data-idx="${idx}">
         <div class="row1">
-          <span class="emoji">${categoryEmoji(catOf(r))}</span>
+          <span class="emoji">${emojiOf(r)}</span>
           <span class="name">${esc(r.name)}</span>
           <span class="stats">${stats}</span>
         </div>
@@ -777,10 +784,24 @@ function buildInfoContent(r) {
     ? `<button class="hide-tiny" onclick="hideRestaurant(${r.id}, this)" title="이 식당 퇴출">⛔</button>`
     : '';
 
+  // 카테고리 수동 변경 드롭다운 (로그인 시) — 자동분류가 틀렸을 때 고정
+  const autoBucket = categoryBucket(catOf(r));
+  const curOverride = r.category_override || '';
+  const catEditLine = canAct
+    ? `<div class="cat-edit">🏷️
+         <select onchange="setCategory(${r.id}, this.value)">
+           <option value="" ${curOverride ? '' : 'selected'}>자동 (${autoBucket})</option>
+           ${Object.keys(BUCKET_EMOJI).map(b =>
+             `<option value="${b}" ${curOverride === b ? 'selected' : ''}>${BUCKET_EMOJI[b]} ${b}</option>`).join('')}
+         </select>${curOverride ? ' <span style="color:#e11d48;font-size:11px">수동</span>' : ''}
+       </div>`
+    : '';
+
   return `<div class="iw">
-    <div class="title">${categoryEmoji(catOf(r))} ${esc(r.name)}${badges}${wishHeart}${hideTinyBtn}</div>
+    <div class="title">${emojiOf(r)} ${esc(r.name)}${badges}${wishHeart}${hideTinyBtn}</div>
     <div class="meta">${esc(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
     <div class="meta">${ratingLine}</div>
+    ${catEditLine}
     ${wishLine}
     ${meLine}
     ${meetupsHtml}
@@ -812,7 +833,7 @@ function renderHiddenList() {
     list.innerHTML = hiddenRestaurants.map(r => `
       <div class="item" style="opacity:0.7">
         <div class="row1">
-          <span class="emoji">${categoryEmoji(catOf(r))}</span>
+          <span class="emoji">${emojiOf(r)}</span>
           <span class="name">${esc(r.name)}</span>
           <button onclick="unhideRestaurant(${r.id}, this)"
             style="padding:3px 8px;font-size:11px;border:1px solid #10b981;background:#fff;color:#10b981;border-radius:4px;cursor:pointer">
@@ -967,6 +988,21 @@ async function bulkCollect() {
     btn.style.cursor = 'pointer';
     alert('대량 수집 실패: ' + e.message);
   }
+}
+
+// ───────── 카테고리 수동 변경 ─────────
+async function setCategory(restaurantId, bucket) {
+  if (!USER.id) return;
+  try {
+    const res = await fetch('/api/category', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ restaurantId, userId: USER.id, bucket }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || '실패');
+    const id = window._lastRestaurantId;
+    await loadRestaurants();
+    if (id) reopenById(id);
+  } catch (e) { alert('카테고리 변경 실패: ' + e.message); }
 }
 
 // ───────── 식당 수동 추가 ─────────
@@ -1390,7 +1426,7 @@ function getMarkerStyle(r) {
   const visits = r.visit_count || 0;
 
   // 기본 (탐험 완료)
-  let style = { color: '#f59e0b', size: 34, emoji: categoryEmoji(catOf(r)), glow: false, ring: null, hollow: false };
+  let style = { color: '#f59e0b', size: 34, emoji: emojiOf(r), glow: false, ring: null, hollow: false };
   // 단골 인기 (10회+)
   if (visits >= 10) { style.size = 44; style.color = '#ef4444'; style.glow = true; style.ring = '🔥'; }
   // 별점 우수 (4.5+)
