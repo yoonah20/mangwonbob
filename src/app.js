@@ -26,10 +26,22 @@ const expressJson = express.json();
 const discoveryMsgs = new Map();
 
 // 앱 시작 시 스키마 자동 적용 (IF NOT EXISTS라 멱등)
+// DB가 부팅 직후 아직 안 떠 있을 수 있어 성공할 때까지 재시도한다.
+// (재시도 없이 한 번 실패하면 새 컬럼 마이그레이션이 조용히 건너뛰어지는 문제 방지)
 async function initDb() {
   const sql = fs.readFileSync(path.join(__dirname, 'db/schema.sql'), 'utf8');
-  await pool.query(sql);
-  console.log('✅ DB 스키마 확인 완료');
+  const maxAttempts = 12;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await pool.query(sql);
+      console.log('✅ DB 스키마 확인 완료');
+      return;
+    } catch (e) {
+      console.error(`⏳ DB 스키마 적용 실패 (${attempt}/${maxAttempts}): ${e.message}`);
+      if (attempt === maxAttempts) throw e;
+      await new Promise(r => setTimeout(r, Math.min(attempt * 1500, 10000)));
+    }
+  }
 }
 
 const useSocketMode = !!process.env.SLACK_APP_TOKEN;
