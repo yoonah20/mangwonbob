@@ -1,5 +1,19 @@
 // PostgreSQL 연결 풀 + 쿼리 모음
 const { Pool } = require('pg');
+const { bucketPattern } = require('../utils/category');
+
+// 카테고리 필터 SQL 조각 — 버킷 키면 category_detail 정규식, 아니면 coarse ILIKE 폴백.
+// where/params를 직접 갱신하고, 붙일 조건 문자열을 반환한다.
+function categoryFilter(category, params) {
+  const pat = bucketPattern(category);
+  if (pat) {
+    params.push(pat);
+    // 상세 경로 우선, 없으면 coarse category 로 매칭
+    return ` AND COALESCE(r.category_detail, r.category) ~ $${params.length}`;
+  }
+  params.push(`%${category}%`);
+  return ` AND r.category ILIKE $${params.length}`;
+}
 
 // railway.internal은 Railway 컨테이너 내부 전용 — 로컬에서는 PUBLIC URL 사용
 const rawUrl = process.env.DATABASE_URL || '';
@@ -88,8 +102,7 @@ async function listDiscoveredRestaurants(category = null, limit = 20) {
   let where = `WHERE COALESCE(r.hidden, FALSE) = FALSE
     AND EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id)`;
   if (category) {
-    params.push(`%${category}%`);
-    where += ` AND r.category ILIKE $${params.length}`;
+    where += categoryFilter(category, params);
   }
   params.push(limit);
   const { rows } = await q(
@@ -106,8 +119,7 @@ async function listUnknownRestaurants(category = null, limit = 5) {
   let where = `WHERE COALESCE(r.hidden, FALSE) = FALSE
     AND NOT EXISTS (SELECT 1 FROM visits v WHERE v.restaurant_id = r.id)`;
   if (category) {
-    params.push(`%${category}%`);
-    where += ` AND r.category ILIKE $${params.length}`;
+    where += categoryFilter(category, params);
   }
   params.push(limit);
   const { rows } = await q(
@@ -125,8 +137,7 @@ async function listRecommendedRestaurants(category = null, limit = 3) {
   const params = [];
   let where = `WHERE COALESCE(r.hidden, FALSE) = FALSE`;
   if (category) {
-    params.push(`%${category}%`);
-    where += ` AND r.category ILIKE $${params.length}`;
+    where += categoryFilter(category, params);
   }
 
   // 점수 계산 — Postgres에서 한 번에

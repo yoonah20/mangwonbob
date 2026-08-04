@@ -69,11 +69,19 @@ function homeBlocks({ teamProgress, mapUrl }) {
     {
       type: 'actions',
       elements: [
-        catBtn('☕ 카페', '카페'),
-        catBtn('🍺 술집', '술집'),
+        catBtn('🥩 고기', '고기'),
+        catBtn('🦞 해산물', '해산물'),
         catBtn('🌶️ 분식', '분식'),
         catBtn('🍗 치킨', '치킨'),
-        catBtn('🥩 고기', '고기'),
+      ],
+    },
+    {
+      type: 'actions',
+      elements: [
+        catBtn('☕ 카페', '카페'),
+        catBtn('🥐 빵집', '빵집'),
+        catBtn('🍺 술집', '술집'),
+        catBtn('🍜 아시아', '아시아'),
       ],
     },
   ];
