@@ -21,7 +21,7 @@
 - Node.js 18+ / Express
 - Slack Bolt SDK (Socket Mode 권장)
 - PostgreSQL
-- Kakao 로컬 API (FD6 음식점 카테고리)
+- Kakao 로컬 API (FD6 음식점 + CE7 카페 카테고리)
 - DeepSeek API (`deepseek-chat`) — 추천 코멘트 생성
 - Railway 배포
 
@@ -76,7 +76,7 @@ npm run init-db
 ```bash
 npm run collect
 ```
-회사 위치(서울 마포구 월드컵로13길 19-25) 반경 500m 내 음식점을 모두 수집합니다.
+회사 위치(서울 마포구 월드컵로13길 19-25) 반경 500m 내 음식점(FD6)과 카페(CE7)를 모두 수집합니다.
 
 > 💡 최초 1회 이후에는 지도의 **🔄 대량 수집** 버튼이나 **월 1회 자동 수집**으로 목록이
 > 계속 최신 상태로 유지되므로 이 명령을 다시 실행할 필요는 없습니다. ([식당 목록 최신화](#-식당-목록-최신화) 참고)

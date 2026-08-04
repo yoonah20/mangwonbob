@@ -9,7 +9,9 @@ const OFFICE = {
   y: 37.5548733,  // 위도
 };
 
-const CATEGORY_GROUP_CODE = 'FD6'; // 음식점
+const CATEGORY_GROUP_CODE = 'FD6'; // 음식점 (기본)
+// 수집 대상 카테고리 그룹 — 음식점(FD6) + 카페(CE7)
+const CATEGORY_GROUP_CODES = ['FD6', 'CE7'];
 
 const client = axios.create({
   baseURL: KAKAO_LOCAL_BASE,
@@ -19,10 +21,10 @@ const client = axios.create({
 });
 
 // 임의 좌표 + 반경으로 카테고리 검색 (페이지네이션)
-async function searchByCategoryAt({ x, y }, radius, page = 1, size = 15) {
+async function searchByCategoryAt({ x, y }, radius, page = 1, size = 15, groupCode = CATEGORY_GROUP_CODE) {
   const { data } = await client.get('/search/category.json', {
     params: {
-      category_group_code: CATEGORY_GROUP_CODE,
+      category_group_code: groupCode,
       x, y, radius, sort: 'distance', size, page,
     },
   });
@@ -44,15 +46,15 @@ async function findLocationByKeyword(keyword) {
   };
 }
 
-// 키워드로 음식점 검색 (수동 추가용 — 회사 반경 2km 내, FD6 카테고리)
-async function searchFoodByKeyword(query, { radius = 2000, size = 10 } = {}) {
+// 키워드로 음식점/카페 검색 (수동 추가용 — 회사 반경 2km 내)
+// 키워드 검색은 그룹코드를 하나만 받으므로, 필터 없이 받아 FD6/CE7만 남긴다.
+async function searchFoodByKeyword(query, { radius = 2000, size = 15 } = {}) {
   const { data } = await client.get('/search/keyword.json', {
     params: {
       query, x: OFFICE.x, y: OFFICE.y, radius, sort: 'distance', size,
-      category_group_code: CATEGORY_GROUP_CODE,
     },
   });
-  return data.documents || [];
+  return (data.documents || []).filter(d => CATEGORY_GROUP_CODES.includes(d.category_group_code));
 }
 
 // Haversine 공식 — 두 좌표 사이 거리(m)
@@ -85,18 +87,21 @@ async function collectAroundCenter(center, radius) {
   }
 
   for (const point of points) {
-    let page = 1;
-    while (true) {
-      const data = await searchByCategoryAt(point, subRadius, page, 15);
-      for (const doc of data.documents) {
-        const dist = haversine(center.y, center.x, parseFloat(doc.y), parseFloat(doc.x));
-        if (dist > radius) continue;
-        if (!found.has(doc.id)) {
-          found.set(doc.id, { ...doc, _distFromCenter: Math.round(dist) });
+    // 그리드 지점마다 음식점(FD6) + 카페(CE7) 각각 페이지네이션
+    for (const groupCode of CATEGORY_GROUP_CODES) {
+      let page = 1;
+      while (true) {
+        const data = await searchByCategoryAt(point, subRadius, page, 15, groupCode);
+        for (const doc of data.documents) {
+          const dist = haversine(center.y, center.x, parseFloat(doc.y), parseFloat(doc.x));
+          if (dist > radius) continue;
+          if (!found.has(doc.id)) {
+            found.set(doc.id, { ...doc, _distFromCenter: Math.round(dist) });
+          }
         }
+        if (data.meta.is_end || page >= 45) break;
+        page += 1;
       }
-      if (data.meta.is_end || page >= 45) break;
-      page += 1;
     }
   }
   return Array.from(found.values());
