@@ -127,6 +127,7 @@ function mapKakaoToRestaurant(doc) {
     kakao_place_id: String(doc.id),
     name: doc.place_name,
     category,
+    category_detail: doc.category_name || null,  // 전체 경로 — 지도 세분화용
     address: doc.address_name,
     road_address: doc.road_address_name,
     phone: doc.phone || null,

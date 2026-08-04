@@ -20,12 +20,13 @@ const q = (text, params) => pool.query(text, params);
 async function upsertRestaurant(r) {
   const sql = `
     INSERT INTO restaurants
-      (kakao_place_id, name, category, address, road_address, phone, kakao_url,
+      (kakao_place_id, name, category, category_detail, address, road_address, phone, kakao_url,
        distance_from_office, latitude, longitude)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
     ON CONFLICT (kakao_place_id) DO UPDATE SET
       name = EXCLUDED.name,
       category = EXCLUDED.category,
+      category_detail = EXCLUDED.category_detail,
       address = EXCLUDED.address,
       road_address = EXCLUDED.road_address,
       phone = EXCLUDED.phone,
@@ -33,7 +34,7 @@ async function upsertRestaurant(r) {
       distance_from_office = EXCLUDED.distance_from_office
     RETURNING *`;
   const { rows } = await q(sql, [
-    r.kakao_place_id, r.name, r.category, r.address, r.road_address,
+    r.kakao_place_id, r.name, r.category, r.category_detail || null, r.address, r.road_address,
     r.phone, r.kakao_url, r.distance_from_office, r.latitude, r.longitude,
   ]);
   return rows[0];

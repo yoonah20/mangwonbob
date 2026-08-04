@@ -193,6 +193,8 @@ npm run dev
 | **월 1회 자동** | 서버 스케줄러 | 매월 1일 새벽 4시(서버 시각) 이후 자동 수집. 신규 식당이 있으면 `MEETUP_CHANNEL_ID` 채널에 공지. |
 
 - 세 방법 모두 `kakao_place_id` 기준 **upsert**라 중복이 쌓이지 않습니다.
+- upsert 시 카카오 원본 카테고리 전체 경로(`category_detail`)도 갱신되므로, 재수집하면
+  지도 카테고리 분류(빵집·해산물 등 세분화)가 최신 기준으로 다시 잡힙니다.
 - 대량 수집은 `POST /api/collect`, 상태 확인은 `GET /api/collect/status` 로도 호출할 수 있습니다.
 - 자동 수집은 잦은 재배포 시 중복 실행되지 않도록 **한 달에 한 번**만 돕니다.
   끄려면 `.env` 에 `DISABLE_AUTO_COLLECT=1` 을 설정하세요.

@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS restaurants (
 
 -- 기존 테이블에도 안전하게 추가
 ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE;
+-- 카카오 원본 카테고리 전체 경로 (예: "음식점 > 간식 > 제과,베이커리") — 세분화 버킷팅용
+ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS category_detail VARCHAR;
 
 CREATE INDEX IF NOT EXISTS idx_restaurants_category ON restaurants(category);
 CREATE INDEX IF NOT EXISTS idx_restaurants_distance ON restaurants(distance_from_office);

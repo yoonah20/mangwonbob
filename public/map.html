@@ -445,31 +445,40 @@ async function loadRestaurants() {
 }
 
 // 카테고리 버킷팅 (이모지 매핑과 일치)
+// 카테고리 버킷팅 — 카카오 전체 경로(category_detail)에 대해 구체적인 것부터 매칭.
+// 재료: catOf(r) = r.category_detail || r.category (상세 없으면 coarse 폴백)
 function categoryBucket(cat) {
   cat = cat || '';
-  if (/한식|국밥|국수|찌개|찜|족발|보쌈|쌈/.test(cat)) return '한식';
-  if (/일식|초밥|스시|라멘|돈까스|우동|텐동/.test(cat)) return '일식';
-  if (/중식|짜장|마라/.test(cat)) return '중식';
-  if (/양식|파스타|피자|버거|스테이크|이탈리|프렌치/.test(cat)) return '양식';
-  if (/카페|커피|디저트|베이커리|빵|티/.test(cat)) return '카페';
-  if (/술집|호프|바|이자카야|와인|맥주/.test(cat)) return '술집';
-  if (/분식|떡볶이|김밥/.test(cat)) return '분식';
-  if (/치킨/.test(cat)) return '치킨';
-  if (/고기|구이|곱창/.test(cat)) return '고기';
-  if (/아시아|쌀국수|태국|베트남/.test(cat)) return '아시아';
+  if (/베이커리|제과|빵|도넛|베이글|크로플|타르트|파리바게|뚜레쥬르/.test(cat)) return '빵집';
+  if (/카페|커피|디저트|아이스크림|빙수|스무디|프라페/.test(cat)) return '카페';
+  if (/일식|초밥|스시|라멘|돈까스|우동|텐동|규동|사시미|오마카세/.test(cat)) return '일식';
+  if (/중식|짜장|짬뽕|마라|중국|탕수육/.test(cat)) return '중식';
+  if (/양식|파스타|피자|스테이크|이탈리|프렌치|멕시|브런치|버거|햄버거|패스트푸드/.test(cat)) return '양식';
+  if (/회|해산물|해물|조개|장어|굴|생선|수산|랍스터/.test(cat)) return '해산물';
+  if (/술집|호프|이자카야|와인|맥주|포차|주점/.test(cat)) return '술집';
+  if (/분식|떡볶이|김밥|만두/.test(cat)) return '분식';
+  if (/치킨|닭강정/.test(cat)) return '치킨';
+  if (/고기|구이|곱창|삼겹|막창|갈비|육류|족발|보쌈/.test(cat)) return '고기';
+  if (/아시아|쌀국수|태국|베트남|인도|퓨전/.test(cat)) return '아시아';
+  if (/뷔페|부페/.test(cat)) return '뷔페';
+  if (/한식|국밥|국수|칼국수|찌개|찜|백반|한정식|순대|해장|설렁탕|감자탕|삼계탕|쌈/.test(cat)) return '한식';
   return '기타';
 }
 
 const BUCKET_EMOJI = {
-  '한식': '🍚', '일식': '🍣', '중식': '🥢', '양식': '🍕', '카페': '☕',
-  '술집': '🍺', '분식': '🌶️', '치킨': '🍗', '고기': '🥩', '아시아': '🍜', '기타': '🍴',
+  '한식': '🍚', '일식': '🍣', '중식': '🥢', '양식': '🍕', '카페': '☕', '빵집': '🥐',
+  '술집': '🍺', '분식': '🌶️', '치킨': '🍗', '고기': '🥩', '해산물': '🦞',
+  '아시아': '🍜', '뷔페': '🍽️', '기타': '🍴',
 };
+
+// 식당의 버킷팅용 카테고리 (상세 경로 우선, 없으면 coarse)
+function catOf(r) { return (r && (r.category_detail || r.category)) || ''; }
 
 // 카테고리 칩 동적 생성 (식당 수 많은 순)
 function renderCatChips() {
   const counts = {};
   restaurants.forEach(r => {
-    const b = categoryBucket(r.category);
+    const b = categoryBucket(catOf(r));
     counts[b] = (counts[b] || 0) + 1;
   });
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
@@ -549,7 +558,7 @@ function renderAll() {
   const q = (document.getElementById('search').value || '').toLowerCase();
   let filtered = restaurants.filter(r => {
     if (q && !r.name.toLowerCase().includes(q) && !(r.category || '').toLowerCase().includes(q)) return false;
-    if (currentCat && categoryBucket(r.category) !== currentCat) return false;
+    if (currentCat && categoryBucket(catOf(r)) !== currentCat) return false;
     return true;
   });
   filtered = applyPreset(filtered, currentPreset);
@@ -608,7 +617,7 @@ function renderAll() {
         : `<span class="status unk">🌫️ 미탐험</span>`;
       return `<div class="item" data-idx="${idx}">
         <div class="row1">
-          <span class="emoji">${categoryEmoji(r.category)}</span>
+          <span class="emoji">${categoryEmoji(catOf(r))}</span>
           <span class="name">${esc(r.name)}</span>
           <span class="stats">${stats}</span>
         </div>
@@ -770,7 +779,7 @@ function buildInfoContent(r) {
     : '';
 
   return `<div class="iw">
-    <div class="title">${categoryEmoji(r.category)} ${esc(r.name)}${badges}${wishHeart}${hideTinyBtn}</div>
+    <div class="title">${categoryEmoji(catOf(r))} ${esc(r.name)}${badges}${wishHeart}${hideTinyBtn}</div>
     <div class="meta">${esc(r.category || '')} · ${formatDist(r.distance_from_office)}</div>
     <div class="meta">${ratingLine}</div>
     ${wishLine}
@@ -804,7 +813,7 @@ function renderHiddenList() {
     list.innerHTML = hiddenRestaurants.map(r => `
       <div class="item" style="opacity:0.7">
         <div class="row1">
-          <span class="emoji">${categoryEmoji(r.category)}</span>
+          <span class="emoji">${categoryEmoji(catOf(r))}</span>
           <span class="name">${esc(r.name)}</span>
           <button onclick="unhideRestaurant(${r.id}, this)"
             style="padding:3px 8px;font-size:11px;border:1px solid #10b981;background:#fff;color:#10b981;border-radius:4px;cursor:pointer">
@@ -1382,7 +1391,7 @@ function getMarkerStyle(r) {
   const visits = r.visit_count || 0;
 
   // 기본 (탐험 완료)
-  let style = { color: '#f59e0b', size: 34, emoji: categoryEmoji(r.category), glow: false, ring: null, hollow: false };
+  let style = { color: '#f59e0b', size: 34, emoji: categoryEmoji(catOf(r)), glow: false, ring: null, hollow: false };
   // 단골 인기 (10회+)
   if (visits >= 10) { style.size = 44; style.color = '#ef4444'; style.glow = true; style.ring = '🔥'; }
   // 별점 우수 (4.5+)
@@ -1391,19 +1400,9 @@ function getMarkerStyle(r) {
 }
 
 // 직접 단순화한 카테고리 → 이모지
+// categoryBucket + BUCKET_EMOJI 단일 소스로 위임 (중복 제거)
 function categoryEmoji(cat) {
-  cat = cat || '';
-  if (/한식|국밥|국수|찌개|찜|족발|보쌈|쌈/.test(cat)) return '🍚';
-  if (/일식|초밥|스시|라멘|돈까스|우동|텐동/.test(cat)) return '🍣';
-  if (/중식|짜장|마라/.test(cat)) return '🥢';
-  if (/양식|파스타|피자|버거|스테이크|이탈리|프렌치/.test(cat)) return '🍕';
-  if (/카페|커피|디저트|베이커리|빵|티/.test(cat)) return '☕';
-  if (/술집|호프|바|이자카야|와인|맥주/.test(cat)) return '🍺';
-  if (/분식|떡볶이|김밥/.test(cat)) return '🌶️';
-  if (/치킨/.test(cat)) return '🍗';
-  if (/고기|구이|곱창/.test(cat)) return '🥩';
-  if (/아시아|쌀국수|태국|베트남/.test(cat)) return '🍜';
-  return '🍴';
+  return BUCKET_EMOJI[categoryBucket(cat)] || '🍴';
 }
 
 // SVG 마커 — 글로우/인기 링 표현
