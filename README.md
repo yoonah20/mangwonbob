@@ -1,210 +1,65 @@
-# 🍚 망원밥 — 슬랙 식당 탐험 RPG 봇
-*by 몬스테라하우스*
+# 망원밥 v2
 
-서울 마포구 망원동 몬스테라하우스 직원들을 위한 회사 근처 식당 탐험 슬랙 봇.
-처음 가는 동네를 RPG처럼 하나씩 탐험하며, 직원들이 직접 리뷰와 별점을 남겨가며
-"우리 동네 맛집 지도"를 함께 만들어 갑니다.
+몬스테라하우스 근처에서 **우리 중 아무도 안 가 본 저녁 밥집**을 골라 주는 슬랙 앱.
+익숙한 곳은 알아서 가고, 새로 갈 곳을 찾을 때 씁니다.
 
----
+- `/밥` → 오늘 가 볼 만한 새 밥집 세 곳 (모두에게 같은 "오늘의 추천", 다시 뽑기·기분 버튼으로 바꿔 보기)
+- 각 가게 ⋯ 메뉴 → **가 봤어요(또 갈래/무난/별로)**, 찜하기, 추천에서 빼기
+- 매주 금요일 16:30 → 채널에 "이번 주 가 볼 만한 새 밥집" 세 곳
 
-## ✨ 핵심 컨셉
+## 추천은 어떻게 고르나
 
-- **🌫️ UNKNOWN** — 아무도 가본 적 없는 미탐험 식당. 이름/카테고리/거리만 노출.
-- **✅ DISCOVERED** — 1명 이상 방문한 식당. 별점/리뷰/방문자 전부 공개.
-- **🏴 첫 발견자** — 가장 먼저 간 사람에게 영구 표시. 채널에 공지됨.
-- **👑 단골** — 같은 식당 3회 이상 방문 시 단골 뱃지.
+`src/domain/recommend.ts` (테스트: `recommend.test.ts`)
 
----
+- 후보: 카카오로 모은 회사 주변 음식점 중 **방문·평가 기록이 없는 곳**. 카페·빵집, 포장·배달 전문, 800m 밖, 숨긴 곳은 제외
+- 점수에 더하는 것: 구글 평점(리뷰 수가 적으면 덜 믿음), 우리가 '또 갈래'를 많이 준 종류, 우리가 아직 안 가 본 종류, 최근에 새로 생긴 곳(월간 수집에서 처음 잡힌 곳), 누가 찜한 곳
+- 점수에서 빼는 것: 체인점, 먼 거리, 최근 7일 안에 오늘의 추천에 나온 곳
+- 점수 비례로 무작위 추첨하고, 세 곳은 가능한 한 서로 다른 종류로
 
-## 🧩 기술 스택
+## 데이터
 
-- Node.js 18+ / Express
-- Slack Bolt SDK (Socket Mode 권장)
-- PostgreSQL
-- Kakao 로컬 API (FD6 음식점 + CE7 카페 카테고리)
-- DeepSeek API (`deepseek-chat`) — 추천 코멘트 생성
-- Railway 배포
+| 출처 | 쓰는 것 | 주기 |
+|---|---|---|
+| 카카오 로컬 API | 회사·망원파출소 반경 500m 음식점 | 매달 자동 (`app_meta.last_collect`) |
+| 구글 Places API (New) | 평점·리뷰 수 | 매일 확인, 25일 지난 것만 갱신 (구글 약관상 30일 안에 갱신, 넘으면 지움) |
 
----
+구글 호출은 등급별로 월 `GOOGLE_MONTHLY_LIMIT`(기본 900)건까지만 합니다. 장소 짝짓기(searchText, Pro 등급)와 평점(details, Enterprise 등급) 모두 무료 한도 안입니다.
 
-## 🗂️ 프로젝트 구조
+## 처음 설치
 
-```
-/src
-  /handlers
-    commands.js      # 슬래시 커맨드 라우팅 + 버튼 액션
-    modals.js        # 리뷰 작성 Modal 처리
-  /services
-    kakao.js         # 카카오 로컬 API 연동
-    deepseek.js      # DeepSeek 추천 코멘트
-    restaurant.js    # 식당 조회/상태 관리
-    review.js        # 방문/리뷰 기록
-    ranking.js       # 탐험 순위 집계
-  /db
-    schema.sql       # 테이블 정의
-    queries.js       # PG 쿼리 모음
-  /utils
-    blocks.js        # Slack Block Kit 빌더
-    format.js        # 포맷 헬퍼
-  app.js             # 메인 서버
-/scripts
-  collect-restaurants.js   # 카카오 데이터 수집
-```
+1. **슬랙 앱** — api.slack.com/apps → Create New App → From a manifest → `slack-manifest.yml` 붙여 넣기.
+   Socket Mode의 App-Level Token(`connections:write`)과 Bot Token을 발급합니다.
+   기존 v1 앱이 `/밥`을 쓰고 있다면 시험하는 동안 매니페스트와 `SLASH_COMMAND`를 `/밥2`처럼 바꿔 두세요.
+2. **구글 Places API 키** — Google Cloud 콘솔에서 프로젝트 생성 → 결제 계정 연결 → "Places API (New)" 사용 설정 → API 키 발급(Places API (New)만 허용하도록 제한 권장).
+3. **Railway** — 새 서비스(이 저장소의 `v2` 브랜치) + 새 Postgres. `.env.example` 의 값을 Variables에 넣습니다. 공개 도메인을 만들어 `PUBLIC_URL`에 넣으면 카드에 종류 타일 이미지가 붙습니다.
+4. **기존 데이터 옮기기** — Railway 셸에서 한 번:
+   ```bash
+   LEGACY_DATABASE_URL=<기존 DB 주소> npm run import-legacy
+   ```
+   식당 869곳, 방문, 리뷰(4~5점 → 또 갈래, 3점 → 무난, 1~2점 → 별로), 가고픈 곳·즐겨찾기(→ 찜)를 옮깁니다.
+5. 구글 평점은 앱이 켜지고 30초 뒤 자동으로 받기 시작합니다. 바로 돌리려면 `npm run collect -- --google-only`.
 
----
+## 개발
 
-## 🚀 빠른 시작
-
-### 1. 의존성 설치
 ```bash
 npm install
+cp .env.example .env   # 값 채우기
+npm run dev            # tsx watch
+npm test               # 순수 로직 테스트 (DB·슬랙 불필요)
+npm run typecheck
 ```
 
-### 2. 환경변수 설정
-`.env.example` 을 복사해 `.env` 파일을 만들고 값을 채워넣어주세요.
-```bash
-cp .env.example .env
 ```
-
-### 3. DB 초기화
-```bash
-npm run init-db
+src/
+  domain/      순수 로직: 종류 분류(kinds), 추천 점수(recommend), 카카오↔구글 이름 짝짓기(match), 주간 소식 시각(schedule)
+  db/          스키마(앱 시작 때 자동 적용)와 쿼리
+  slack/       Block Kit 화면(blocks), 버튼 처리(handlers), 종류 타일(tiles)
+  kakao/       카카오 로컬 API 수집
+  google/      구글 Places 호출과 평점 동기화
+  picks.ts     오늘의 추천·다시 뽑기·주간 추천
+  weekly.ts    주간 소식 발송
+  collect.ts   월간 카카오 수집
+  scripts/     import-legacy, collect
+assets/tiles/  종류 타일 PNG (`npm run render-tiles` 로 다시 생성)
+docs/          리뉴얼 기획안
 ```
-또는 PostgreSQL에 직접 `src/db/schema.sql` 실행.
-
-### 4. 식당 데이터 수집
-```bash
-npm run collect
-```
-회사 위치(서울 마포구 월드컵로13길 19-25) 반경 500m 내 음식점(FD6)과 카페(CE7)를 모두 수집합니다.
-
-> 💡 최초 1회 이후에는 지도의 **🔄 대량 수집** 버튼이나 **월 1회 자동 수집**으로 목록이
-> 계속 최신 상태로 유지되므로 이 명령을 다시 실행할 필요는 없습니다. ([식당 목록 최신화](#-식당-목록-최신화) 참고)
-
-### 5. 서버 실행
-```bash
-npm start
-# 또는 개발 모드 (변경 시 자동 재시작)
-npm run dev
-```
-
----
-
-## 🔧 카카오 Developers 키 발급
-
-1. <https://developers.kakao.com> 접속 → 로그인
-2. **내 애플리케이션** → **애플리케이션 추가하기**
-   - 앱 이름: `망원밥` (자유)
-   - 회사명: `몬스테라하우스`
-3. 생성된 앱 → **앱 키** 탭에서 **REST API 키** 복사 → `.env` 의 `KAKAO_REST_API_KEY` 에 붙여넣기
-4. **플랫폼 설정**은 서버 사용 시 별도 설정 불필요 (REST API 키만 있으면 호출 가능)
-
-> 카카오 로컬 API 무료 한도: 1일 100,000회 (충분)
-
----
-
-## 🤖 DeepSeek API 키 발급
-
-1. <https://platform.deepseek.com> 접속 → 회원가입/로그인
-2. **API Keys** 메뉴에서 **Create new API key**
-3. 발급된 키를 `.env` 의 `DEEPSEEK_API_KEY` 에 붙여넣기
-4. (선택) 다른 모델 사용 시 `DEEPSEEK_MODEL` 로 오버라이드 (기본값 `deepseek-chat`)
-
-> DeepSeek은 OpenAI 호환 인터페이스라 별도 SDK 없이 `axios` 로 호출합니다.
-> 키가 없으면 별점 기반 폴백 코멘트로 동작하므로 봇 자체는 그대로 작동합니다.
-
----
-
-## 💬 Slack App 생성
-
-### 1. Slack App 만들기
-1. <https://api.slack.com/apps> → **Create New App** → **From scratch**
-2. 앱 이름: `망원밥`, 설치할 워크스페이스 선택
-
-### 2. Slash Command 등록
-- **Slash Commands** → **Create New Command**
-  - Command: `/밥`
-  - Request URL: (Socket Mode 사용 시 빈 값 가능 / HTTP 모드면 `https://your-domain/slack/events`)
-  - Short Description: `오늘의 망원밥 추천`
-  - Usage Hint: `[카테고리] | 방문 [식당명] | 리뷰 [식당명] | 탐험 | 지도`
-
-### 3. Bot Token Scopes
-**OAuth & Permissions** → **Scopes** → **Bot Token Scopes**:
-- `chat:write`
-- `commands`
-- `users:read`
-- `im:write` (리뷰 확인 DM용)
-
-### 4. Interactivity & Shortcuts (Modal용)
-- **Interactivity & Shortcuts** → **Interactivity** ON
-- (Socket Mode면 Request URL 불필요)
-
-### 5. Socket Mode 활성화 (권장)
-- **Socket Mode** → **Enable Socket Mode** ON
-- App-Level Token 생성 (`connections:write` 스코프)
-- 발급된 토큰을 `.env` 의 `SLACK_APP_TOKEN` (`xapp-...`) 에 입력
-
-### 6. 워크스페이스에 설치
-- **Install App** → **Install to Workspace**
-- 발급된 Bot Token (`xoxb-...`) → `.env` 의 `SLACK_BOT_TOKEN`
-- **Basic Information** → Signing Secret → `.env` 의 `SLACK_SIGNING_SECRET`
-
----
-
-## 🚂 Railway 배포
-
-1. <https://railway.app> 로그인 → **New Project** → **Deploy from GitHub repo**
-2. 이 저장소 선택
-3. **+ New** → **Database** → **PostgreSQL** 추가 (자동으로 `DATABASE_URL` 주입됨)
-4. 프로젝트 **Variables** 에 환경변수 추가:
-   - `SLACK_BOT_TOKEN`
-   - `SLACK_SIGNING_SECRET`
-   - `SLACK_APP_TOKEN`
-   - `KAKAO_REST_API_KEY`
-   - `DEEPSEEK_API_KEY`
-5. 첫 배포 후 한 번만 실행:
-   ```bash
-   # Railway 셸(또는 로컬에서 DATABASE_URL을 export 한 뒤)
-   npm run init-db
-   npm run collect
-   ```
-6. Slack 워크스페이스에서 `/밥` 입력 → 끝!
-
----
-
-## 🎮 슬랙 사용법
-
-| 명령어 | 설명 |
-|---|---|
-| `/밥` | 팀 탐험 현황 + 오늘의 추천 식당 3곳 + 지도 보기 버튼 |
-
-> 모든 액션(체크인/리뷰/즐겨찾기/모집/검색/카테고리 필터/퇴출/복구)은 **🗺️ 지도에서 전체 보기** 버튼으로 들어간 지도 페이지에서 처리합니다. 식당 이름을 매번 타이핑할 필요 없이 마커를 클릭하면 끝.
-
----
-
-## 🔄 식당 목록 최신화
-
-새 식당이 생기거나 폐업하는 동네 특성상, 목록을 꾸준히 갱신할 수 있는 3가지 방법을 제공합니다.
-
-| 방법 | 사용처 | 설명 |
-|---|---|---|
-| **개별 추가** | 지도 **➕ 추가** | 이름으로 검색해 한 곳씩 추가. 카카오에 없는 곳은 불가. |
-| **대량 수집** | 지도 **🔄 대량 수집** | 회사 주변(회사 + 망원파출소 각 500m)을 한 번에 재수집. 신규 발견 곳 수를 즉시 표시. |
-| **월 1회 자동** | 서버 스케줄러 | 매월 1일 새벽 4시(서버 시각) 이후 자동 수집. 신규 식당이 있으면 `MEETUP_CHANNEL_ID` 채널에 공지. |
-
-- 세 방법 모두 `kakao_place_id` 기준 **upsert**라 중복이 쌓이지 않습니다.
-- upsert 시 카카오 원본 카테고리 전체 경로(`category_detail`)도 갱신되므로, 재수집하면
-  지도 카테고리 분류(빵집·해산물 등 세분화)가 최신 기준으로 다시 잡힙니다.
-- 대량 수집은 `POST /api/collect`, 상태 확인은 `GET /api/collect/status` 로도 호출할 수 있습니다.
-- 자동 수집은 잦은 재배포 시 중복 실행되지 않도록 **한 달에 한 번**만 돕니다.
-  끄려면 `.env` 에 `DISABLE_AUTO_COLLECT=1` 을 설정하세요.
-- 수집 로직은 `src/services/collect.js` 한 곳에 있으며 CLI(`npm run collect`)·버튼·스케줄러가 공유합니다.
-
----
-
-## 🌿 기획/디자인 노트
-
-- 팀 동기부여를 위해 첫 발견 알림은 **채널 공개**, 그 외는 ephemeral.
-- 미탐험 식당은 정보를 의도적으로 가려서 "탐험 동기"를 만든다.
-- DeepSeek의 추천 코멘트는 30자 이내 짧고 친근한 톤으로 고정.
-- 모든 메시지 푸터에 `🌿 망원밥 by 몬스테라하우스` 브랜딩 유지.

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { recommend, kindTaste, type PlaceInput } from './recommend.js';
+import { recommend, kindTaste, adjustedRating, type PlaceInput } from './recommend.js';
 import { kindOf, matchesMood } from './kinds.js';
 
 const now = new Date('2026-10-16T09:00:00Z');
@@ -9,7 +9,8 @@ function place(over: Partial<PlaceInput>): PlaceInput {
   return {
     id: nextId++, name: `식당${nextId}`, categoryPath: '음식점 > 한식', kindOverride: null,
     distanceM: 200, firstSeenAt: new Date('2026-05-01'), source: 'legacy', kakaoUrl: null,
-    ups: 0, mehs: 0, downs: 0, visits: 0, lastVisitedAt: null, bestComment: null, wishedBy: [],
+    googleRating: null, googleRatingCount: null,
+    ups: 0, mehs: 0, downs: 0, visits: 0, wishedBy: [],
     ...over,
   };
 }
@@ -31,9 +32,9 @@ test('moods', () => {
   assert.ok(matchesMood('한잔', '해산물', '음식점 > 한식 > 해물,생선 > 회'));
 });
 
-test('one verified place plus unvisited ones, all different kinds', () => {
+test('only places nobody has been to, three different kinds', () => {
   const places = [
-    place({ categoryPath: '음식점 > 한식 > 육류,고기', ups: 2, visits: 2, bestComment: '갈매기살' }),
+    place({ categoryPath: '음식점 > 한식 > 육류,고기', ups: 2, visits: 2 }),
     place({ categoryPath: '음식점 > 일식' }),
     place({ categoryPath: '음식점 > 중식' }),
     place({ categoryPath: '음식점 > 양식' }),
@@ -41,12 +42,11 @@ test('one verified place plus unvisited ones, all different kinds', () => {
   ];
   const picks = recommend(places, { seed: 'a', now });
   assert.equal(picks.length, 3);
-  assert.equal(picks.filter(p => p.verified).length, 1);
-  assert.equal(picks[0].reason, '"갈매기살"');
+  assert.ok(!picks.some(p => p.placeId === places[0].id));
   assert.equal(new Set(picks.map(p => p.kind)).size, 3);
 });
 
-test('never recommends cafes, far places, disliked or visited-unrated places', () => {
+test('never recommends cafes, far places or anywhere we have been', () => {
   const bad = [
     place({ categoryPath: '음식점 > 카페' }),
     place({ categoryPath: '음식점 > 일식', distanceM: 1200 }),
@@ -71,6 +71,21 @@ test('same seed gives same picks, different seed varies', () => {
   assert.ok(seen.size > 5);
 });
 
+test('takeout-only shops are never recommended', () => {
+  const takeout = place({ name: '369 활어회포장전문', categoryPath: '음식점 > 한식 > 해물,생선 > 회' });
+  const dineIn = place({ categoryPath: '음식점 > 일식' });
+  for (const seed of ['1', '2', '3']) {
+    assert.deepEqual(recommend([takeout, dineIn], { seed, now }).map(p => p.placeId), [dineIn.id]);
+  }
+});
+
+test('cards show the detailed category', () => {
+  const [p] = recommend([place({ categoryPath: '음식점 > 술집 > 일본식주점' })], { seed: 'd', now });
+  assert.equal(p.detail, '일본식주점');
+  const [q] = recommend([place({ categoryPath: '음식점 > 치킨 > 페리카나' })], { seed: 'd', now });
+  assert.equal(q.detail, '치킨');
+});
+
 test('exclude and mood filters apply', () => {
   const soup = place({ categoryPath: '음식점 > 한식 > 국밥' });
   const meat = place({ categoryPath: '음식점 > 한식 > 육류,고기 > 갈비' });
@@ -85,6 +100,24 @@ test('wished and new places lead with their reason', () => {
   const byId = new Map(picks.map(p => [p.placeId, p.reason]));
   assert.match(byId.get(wished.id)!, /<@U1>/);
   assert.equal(byId.get(fresh.id), '최근에 새로 생긴 곳');
+});
+
+test('google rating trusts many reviews more than a few', () => {
+  assert.equal(adjustedRating(null, null), null);
+  assert.ok(adjustedRating(4.8, 300)! > adjustedRating(5.0, 3)!);
+  assert.ok(Math.abs(adjustedRating(4.1, 100)! - 4.1) < 1e-9);
+});
+
+test('well-rated places come up far more often than poorly rated ones', () => {
+  const great = place({ categoryPath: '음식점 > 일식', googleRating: 4.7, googleRatingCount: 400 });
+  const poor = place({ categoryPath: '음식점 > 일식 > 초밥,롤', googleRating: 3.2, googleRatingCount: 200 });
+  let greatWins = 0;
+  for (let i = 0; i < 200; i++) {
+    if (recommend([great, poor], { seed: `g${i}`, now, count: 1 })[0].placeId === great.id) greatWins++;
+  }
+  assert.ok(greatWins > 180, `great won ${greatWins}/200`);
+  const [pick] = recommend([great], { seed: 'r', now, count: 1 });
+  assert.equal(pick.reason, '구글 평점이 높은 곳');
 });
 
 test('taste favours liked kinds', () => {

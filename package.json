@@ -11,8 +11,9 @@
     "dev": "tsx watch src/index.ts",
     "test": "node --import tsx --test src/*/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "import-legacy": "tsx src/scripts/import-legacy.ts",
-    "collect": "tsx src/scripts/collect.ts"
+    "import-legacy": "node dist/scripts/import-legacy.js",
+    "collect": "node dist/scripts/collect.js",
+    "render-tiles": "./scripts/render-tiles.sh"
   },
   "engines": {
     "node": ">=20"

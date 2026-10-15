@@ -19,6 +19,12 @@ CREATE TABLE IF NOT EXISTS places (
   first_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   hidden         BOOLEAN NOT NULL DEFAULT FALSE
 );
+-- 구글 평점. 구글 약관상 평점은 30일 안에 다시 받아야 해서 checked_at으로 갱신 시점을 잡는다.
+ALTER TABLE places ADD COLUMN IF NOT EXISTS google_place_id     TEXT;
+ALTER TABLE places ADD COLUMN IF NOT EXISTS google_rating       REAL;
+ALTER TABLE places ADD COLUMN IF NOT EXISTS google_rating_count INT;
+ALTER TABLE places ADD COLUMN IF NOT EXISTS google_checked_at   TIMESTAMPTZ;
+ALTER TABLE places ADD COLUMN IF NOT EXISTS google_match_failed_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS visits (
   id            SERIAL PRIMARY KEY,
@@ -62,7 +68,6 @@ CREATE TABLE IF NOT EXISTS daily_picks (
   slot     SMALLINT NOT NULL,
   place_id INT NOT NULL REFERENCES places(id) ON DELETE CASCADE,
   reason   TEXT NOT NULL,
-  verified BOOLEAN NOT NULL,
   PRIMARY KEY (day, slot)
 );
 `;

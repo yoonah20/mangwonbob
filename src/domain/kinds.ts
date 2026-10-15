@@ -51,8 +51,22 @@ export function matchesMood(mood: Mood, kind: Kind, categoryPath: string | null 
 }
 
 // 이름이나 경로로 알아보는 체인점. 빼지는 않고 점수만 깎는다.
-const CHAINS = /롯데리아|맥도날드|버거킹|맘스터치|KFC|서브웨이|타코벨|이삭토스트|김밥천국|본죽|BHC|BBQ|교촌|페리카나|굽네|네네|처갓집|행복한찜닭|구구족|명랑핫도그|홍콩반점|역전우동|하남돼지|새마을식당|한신포차|투다리|스타벅스|메가MGC|컴포즈|이디야|빽다방|파리바게뜨|뚜레쥬르/i;
+const CHAINS = /롯데리아|맥도날드|버거킹|맘스터치|KFC|서브웨이|타코벨|이삭토스트|김밥천국|본죽|BHC|BBQ|교촌|페리카나|굽네|네네|처갓집|또래오래|호식이|60계|자담|푸라닭|노랑통닭|계림원|누구나홀딱반한닭|멕시카나|지코바|행복한찜닭|구구족|족발천하|명랑핫도그|홍콩반점|역전우동|하남돼지|새마을식당|한신포차|투다리|도미노|피자헛|파파존스|피자스쿨|스타벅스|메가MGC|컴포즈|이디야|빽다방|파리바게뜨|뚜레쥬르/i;
 
 export function isChain(name: string, categoryPath: string | null | undefined): boolean {
   return CHAINS.test(name) || CHAINS.test(categoryPath ?? '');
+}
+
+// 앉아서 먹을 수 없는 곳 (포장·배달 전문). 추천에서 아예 뺀다.
+const TAKEOUT_ONLY = /포장전문|배달전문|포장 전문|배달 전문|테이크아웃|밀키트/;
+
+export function isTakeoutOnly(name: string, categoryPath: string | null | undefined): boolean {
+  return TAKEOUT_ONLY.test(name) || /도시락|밀키트/.test(categoryPath ?? '');
+}
+
+// 카드에 보여 줄 세부 종류: 경로의 마지막 칸 ("음식점 > 술집 > 일본식주점" → "일본식주점")
+export function detailOf(categoryPath: string | null | undefined, kind: Kind): string {
+  const last = (categoryPath ?? '').split('>').map(x => x.trim()).filter(Boolean).pop();
+  if (!last || last === '음식점' || CHAINS.test(last)) return kind;
+  return last.replace(/,/g, '·');
 }
